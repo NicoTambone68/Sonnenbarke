@@ -104,15 +104,20 @@ update_cluster_metadata(Scn) ->
 
 % Create a new metadata storage 
 %  WARNING! Overwrites data
-%  TO DO: Read default data from config/sys.config
-%         and set NewCMeta accordingly
-% something like this. (Note filter in this example is wrong) 
-% {ok,K}=application:get_env(system_metadata, cluster).
-% lists:filter(fun(E) -> {name,_} = E  end, K).
+% TO DO: check and debug
 % 
 create_cluster_metadata() ->
+   % Read initial values from config/sys.config
+   {ok,L} = application:get_env(system_metadata, cluster),
+   [{name, ClusterName}] = lists:filter(fun({X,_}) -> X == name end, L),
+   [{starting_scn, StartingScn}] = lists:filter(fun({X,_}) -> X == starting_scn end, L),
+   [{ra_home_dir, RaHomeDir}] = lists:filter(fun({X,_}) -> X == ra_home_dir end, L),
+   [{cluster_datafiles_home_dir, CDHomeDir}] = lists:filter(fun({X,_}) -> X == cluster_datafiles_home_dir end, L),
+   [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, L),
    % New Metadata Record w default values
-   NewCMeta = ?SYSTEM{},
+   NewCMeta = ?SYSTEM{ name = ClusterName
+		      ,last_scn = StartingScn
+		      ,nodes = Nodes},
    sbdbs:open_tables(),
    sbdbs:update_cluster_metadata(NewCMeta),
    sbdbs:close_tables().
