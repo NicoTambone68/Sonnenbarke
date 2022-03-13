@@ -1,4 +1,4 @@
--module(kvcount).
+-module(sbcount).
 -behaviour(gen_server).
 
 -export([

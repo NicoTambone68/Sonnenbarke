@@ -1,7 +1,7 @@
 %% See also:
 %%% https://github.com/rabbitmq/ra-examples/blob/master/refcell/src/refcell.erl
 
--module(kv).
+-module(sb).
 -behaviour(ra_machine).
 -include("sys_meta.hrl").
 
@@ -21,7 +21,7 @@
 	 system_msg/1,
 	 command/1,
 	 restart/0,
-	 restart/1,
+%	 restart/1,
 
          %% Cluster management API
 	 create_cluster_metadata/0,
@@ -35,11 +35,13 @@
 -define(RA_HOME_DIR, './.ra').
 % minimum required nodes to form a cluster
 -define(MIN_NODES, 3).
+% System Metadata Table Name
+-define(SYSTEM, #sys_meta).
 
 %% ra_machine implementation
 
 init(_Config) -> 
-	kvsystem:start(),
+	sbsystem:start(),
 	[ok]. %#{}.
 
 
@@ -76,9 +78,9 @@ system_effects(Scn) ->
     io:format(" Updating followers SCN to ~p~n", [Scn]).
 
 command_effects(Value) ->
-   Scn = kvsystem:get_scn(),
+   Scn = sbsystem:get_scn(),
    io:format("Received command: ~p. Now updating followers SCN to ~p~n", [Value, Scn]),
-   {_, ClusterMetaData} = kvsystem:get_cluster_metadata(),
+   {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
    Nodes = ClusterMetaData#sys_meta.nodes,
    % Update metadata on every node of the cluster but the leader node which is already updated 
    [io:format("Updating Metadata on node ~p, Result: ~p~n",  
@@ -108,38 +110,47 @@ send_msg(ServerId, Value) ->
 
 send_msg2(Value) ->
     % TO DO: switch to persistent term?
-    % {_, CMeta} = kvets:get_cluster_metadata(ram),
-    ClusterName = kvsystem:get_cluster_name(),
-%    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, kvsystem:get_scn()}),
+    % {_, CMeta} = sbdbs:get_cluster_metadata(ram),
+    ClusterName = sbsystem:get_cluster_name(),
+%    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, sbsystem:get_scn()}),
     {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, 999}),
      io:format("Current leader is ~p~n", [_Leader]),
     Result.
 
 system_msg(Value) ->
-    ClusterName = kvsystem:get_cluster_name(),
+    ClusterName = sbsystem:get_cluster_name(),
     Scn = 9991,
     {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {system, node(), Value, Scn}),
     Result.
 
 
 command(Command) ->
-    ClusterName = kvsystem:get_cluster_name(),
+    ClusterName = sbsystem:get_cluster_name(),
     {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {command, Command}),
     Result.
 
 
 
 % restart after a crash
-restart(Node) ->
-    Name = ra_cluster,
-    % ra:start(),
-    % § TO DO: Test this function
-    % data_dir, file:filename()}
-    rpc:call(Node, ra, start_in, [?RA_HOME_DIR]),
-    ra:restart_server({Name, Node}).
+%restart(Node) ->
+%    Name = ra_cluster,
+%    % ra:start(),
+%    % § TO DO: Test this function
+%    % data_dir, file:filename()}
+%    rpc:call(Node, ra, start_in, [?RA_HOME_DIR]),
+%    ra:restart_server({Name, Node}).
 
 restart() ->
-    restart(node()).
+    % open tables in order to force repair 
+    % then close them again
+    % TO DO: create a function on the sbsystem module
+    sbdbs:open_tables(),
+    sbdbs:close_tables(),
+    {_, CMeta} = ?MODULE:get_cluster_metadata(disk),
+%%%%    restart(node()),
+    ra:start_in(?RA_HOME_DIR),
+    ra:restart_server({CMeta?SYSTEM.name, node()}),
+    ?MODULE:init().
 
 
 %% Cluster api
@@ -147,13 +158,13 @@ restart() ->
 %%
 %% From == ram | disk
 get_cluster_metadata(From) ->
-   kvets:open_tables(),
-   {Response, ClusterMetaData} = kvets:get_cluster_metadata(From),
+   sbdbs:open_tables(),
+   {Response, ClusterMetaData} = sbdbs:get_cluster_metadata(From),
    {Response, ClusterMetaData}.
 
 
 update_cluster_metadata(ClusterMetaData) ->
-   kvets:update_cluster_metadata(ClusterMetaData, both).
+   sbdbs:update_cluster_metadata(ClusterMetaData, both).
 
 
 % you need at least three nodes to form a cluster 
@@ -169,13 +180,13 @@ check_active_nodes(Responses) ->
 
 % TO DO: no! prendere i metadati dallo storage locale.
 % fare controllo integrita', partire solo se ok
-% e start di kvsystem solo al termine
+% e start di sbsystem solo al termine
 start_cluster() ->
-%   {ok, Pid} = kvsystem:start(),
+%   {ok, Pid} = sbsystem:start(),
 %   case is_process_alive(Pid) of
-   kvets:open_tables(),
-   {Response, Cluster} = kvets:get_cluster_metadata(disk),
-   kvets:close_tables(),
+   sbdbs:open_tables(),
+   {Response, Cluster} = sbdbs:get_cluster_metadata(disk),
+   sbdbs:close_tables(),
    case Response of
       ok ->
          Nodes = Cluster#sys_meta.nodes,	
@@ -230,12 +241,12 @@ stopping_sequence() ->
          Nodes = Cluster#sys_meta.nodes,
          [io:format("Stopping Ra on node ~s, response: ~p~n", 
                  [N, rpc:call(N, ra, stop_server, [default, {Cluster#sys_meta.name, N}])]) || N <- Nodes],
-         [rpc:call(N, kvets, close_tables, []) || N <- Nodes]
+         [rpc:call(N, sbdbs, close_tables, []) || N <- Nodes]
    end.
 
 % Create a new metadata storage 
 %  WARNING! Overwrites data
 create_cluster_metadata() ->
-   kvsystem:create_cluster_metadata().
+   sbsystem:create_cluster_metadata().
    
 
