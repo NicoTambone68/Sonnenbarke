@@ -114,6 +114,19 @@ create_cluster_metadata() ->
    [{ra_home_dir, RaHomeDir}] = lists:filter(fun({X,_}) -> X == ra_home_dir end, L),
    [{cluster_datafiles_home_dir, CDHomeDir}] = lists:filter(fun({X,_}) -> X == cluster_datafiles_home_dir end, L),
    [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, L),
+   % If it doesn't exist create the home directory for cluster datafiles and metadata
+   % The path structure is: cluster_datafiles_home_dir/node_name
+   CDHomeDirNode = lists:concat([CDHomeDir, "/", node()]),
+   case filelib:is_dir(CDHomeDirNode) of
+	   false -> file:make_dir(CDHomeDirNode);
+	   true -> ok
+   end,
+   % Same story for the .ra home directory
+   RaHomeDirNode = lists:concat([RaHomeDir, "/", node()]),
+   case filelib:is_dir(RaHomeDirNode) of
+	   false -> file:make_dir(RaHomeDirNode);
+	   true -> ok
+   end,
    % New Metadata Record w default values
    NewCMeta = ?SYSTEM{ name = ClusterName
 		      ,last_scn = StartingScn
