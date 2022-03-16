@@ -16,7 +16,7 @@
    create_cluster_metadata/0,
    update_cluster_metadata/1,
    get_scn/0,
-   next_scn/0,
+%   _get_scn/0,
    am_i_leader/0,
    handle_call/3,
    handle_cast/2
@@ -79,13 +79,13 @@ case Call of
      disk -> {_, Response} = sbdbs:get_cluster_metadata(disk)
    end;
    get_cluster_name -> Response = read_cluster_name();
-   get_scn -> Response = next_scn();
-   {set_cluster_status, Status} -> Response = new_cluster_status(Status);
+   get_scn -> Response = get_scn_();
+   {set_cluster_status, Status} -> Response = set_cluster_status_(Status);
    _ -> Response = no_data
 end,
 {reply, Response, state()}.
 
-next_scn() ->
+get_scn_() ->
    Scn = sbcount:get_sequence(?SCN),
    ?MODULE:update_cluster_metadata(Scn),
    Scn.
@@ -140,7 +140,7 @@ read_cluster_name() ->
    {_, CMeta} = sbdbs:get_cluster_metadata(ram),
    CMeta?SYSTEM.name.
 
-new_cluster_status(Status) ->
+set_cluster_status_(Status) ->
    {_, CMeta} = sbdbs:get_cluster_metadata(ram),
    CMetaUpdated = CMeta?SYSTEM{status = Status},
    sbdbs:update_cluster_metadata(CMetaUpdated, both),

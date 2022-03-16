@@ -10,15 +10,15 @@
          init/1, init/0,
          apply/3,
 	 state_enter/2,
-	 my_effects/2,
+%	 my_effects/2,
 	 system_effects/1,
 	 command_effects/1,
 	 
 
          %% Client api
-         send_msg/2,
-	 send_msg2/1,
-	 system_msg/1,
+%         send_msg/2,
+%	 send_msg2/1,
+	 system_command/1,
 	 command/1,
 	 restart/0,
 %	 restart/1,
@@ -41,48 +41,81 @@
 %% ra_machine implementation
 
 init(_Config) -> 
-	sbsystem:start(),
-	[ok]. %#{}.
+   sbsystem:start(),
+   [ok]. %#{}.
 
 
 init() ->
-    application:ensure_all_started(ra),
-    init(init).
+   application:ensure_all_started(ra),
+   init(init).
+
 
 apply(_Meta, Param, State) ->
 	case Param of
-           {system, From, Value, Scn} ->
-             io:format("~p Dest: ~p Received system message ~p with state ~p and SCN ~p~n", 
-     			 [maps:get(system_time, _Meta), From, Value, State, Scn]),
-             NewState = open,
-	     Reply = ok,
-	     Effects = [{mod_call, ?MODULE, system_effects, [Scn]}],
+	   %% System messages 
+           {system, Value} ->
+             % io:format("~p Dest: ~p Received system message ~p with state ~p and SCN ~p~n", 
+     	     % [maps:get(system_time, _Meta), From, Value, State, Scn]),
+             case Value of
+                {set_cluster_state, ClusterState}
+		 when ClusterState =:= open; ClusterState =:= closed ->
+                   NewState = ClusterState,
+	           Reply = ok,
+	           Effects = [{mod_call, ?MODULE, system_effects, [Value]}];
+                _ ->
+                   NewState = State,
+	           Reply = {error, invalid_system_message},
+	           Effects = []	   
+             end,
 	     {NewState, Reply, Effects};
-           {send_msg, Value, Scn} ->
-             {[io:format("Received message #1 ~p with state ~p and SCN ~p~n", [Value, State, Scn])], ok};
-           {send_msg2, Value, Scn} ->
-             io:format("Received message #2 ~p with state ~p and SCN ~p~n", [Value, State, Scn]),
-	     Effects = [{mod_call, ?MODULE, my_effects, [State, Scn]}],
-             {State, ok, Effects};
+%           {send_msg2, Value, Scn} ->
+%             io:format("Received message #2 ~p with state ~p and SCN ~p~n", [Value, State, Scn]),
+%	     Effects = [{mod_call, ?MODULE, my_effects, [State, Scn]}],
+%             {State, ok, Effects};
 	   {command, Value} ->
               io:format("Received command ~p~n", [Value]),
 	      Effects = [{mod_call, ?MODULE, command_effects, [Value]}],
               {State, ok, Effects}
 	end.
-		
 
-my_effects(State, Scn) ->
-   io:format("Effect triggered by system message. Leader: ~p, state: ~p, SCN:~p~n", [node(), State, Scn]).
+%my_effects(State, Scn) ->
+%   io:format("Effect triggered by system message. Leader: ~p, state: ~p, SCN:~p~n", [node(), State, Scn]).
 
-system_effects(Scn) ->
-    io:format(" Updating followers SCN to ~p~n", [Scn]).
+system_effects(Value) ->
+   case Value of
+      {set_cluster_state, ClusterState} 
+	when ClusterState =:= open; ClusterState =:= closed ->
+         {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+         NewClusterMetaData = ClusterMetaData?SYSTEM{status = ClusterState},
+	 update_cluster_metadata(NewClusterMetaData),
+	 update_followers_metadata(NewClusterMetaData),
+         io:format("Cluster state: ~p~n", [ClusterState]);
+      _ -> {error, invalid_system_effect_parameter}
+   end.	   
 
+% TO DO: get_scn() only for transactions since it's useless for read-only operations
 command_effects(Value) ->
    Scn = sbsystem:get_scn(),
    io:format("Received command: ~p. Now updating followers SCN to ~p~n", [Value, Scn]),
    {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-   Nodes = ClusterMetaData#sys_meta.nodes,
+   update_followers_metadata(ClusterMetaData).
+   %Nodes = ClusterMetaData?SYSTEM.nodes,
    % Update metadata on every node of the cluster but the leader node which is already updated 
+%   [io:format("Updating Metadata on node ~p, Result: ~p~n",  
+%   	      [N, 
+%	        try erpc:call(N, ?MODULE, update_cluster_metadata, [ClusterMetaData]) of
+%		   _ -> ok
+%	        catch
+%		   error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
+%		end
+%	      ]) || N <- Nodes, N /= node()].
+
+
+% TO DO: add parameter Metadata and implement the function
+update_followers_metadata(ClusterMetaData) -> 
+   % Update metadata on every node of the cluster but the leader node which is already updated 
+   % This function must be called solely by the leader through one of the Effects method
+   Nodes = ClusterMetaData?SYSTEM.nodes,
    [io:format("Updating Metadata on node ~p, Result: ~p~n",  
    	      [N, 
 	        try erpc:call(N, ?MODULE, update_cluster_metadata, [ClusterMetaData]) of
@@ -90,8 +123,9 @@ command_effects(Value) ->
 	        catch
 		   error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
 		end
-	      ]) || N <- Nodes, N /= node()].
-   
+	      ]) || N <- Nodes, N /= node()],
+   ok.
+
 
 state_enter(leader, _) ->
     ServerId = {ra_cluster, node()},
@@ -103,24 +137,20 @@ state_enter(_, _) ->
 %% Client api
 
 %% Test Nick
-send_msg(ServerId, Value) ->
-    {ok, Result, _Leader} = ra:process_command(ServerId, {send_msg, Value}),
-     io:format("Current leader is ~p~n", [_Leader]),
-    Result.
+%send_msg(ServerId, Value) ->
+%    {ok, Result, _Leader} = ra:process_command(ServerId, {send_msg, Value}),
+%     io:format("Current leader is ~p~n", [_Leader]),
+%    Result.
+%
+%send_msg2(Value) ->
+%    ClusterName = sbsystem:get_cluster_name(),
+%    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, 999}),
+%     io:format("Current leader is ~p~n", [_Leader]),
+%    Result.
 
-send_msg2(Value) ->
-    % TO DO: switch to persistent term?
-    % {_, CMeta} = sbdbs:get_cluster_metadata(ram),
+system_command(Value) ->
     ClusterName = sbsystem:get_cluster_name(),
-%    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, sbsystem:get_scn()}),
-    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, 999}),
-     io:format("Current leader is ~p~n", [_Leader]),
-    Result.
-
-system_msg(Value) ->
-    ClusterName = sbsystem:get_cluster_name(),
-    Scn = 9991,
-    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {system, node(), Value, Scn}),
+    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {system, Value}),
     Result.
 
 
@@ -130,16 +160,7 @@ command(Command) ->
     Result.
 
 
-
 % restart after a crash
-%restart(Node) ->
-%    Name = ra_cluster,
-%    % ra:start(),
-%    % § TO DO: Test this function
-%    % data_dir, file:filename()}
-%    rpc:call(Node, ra, start_in, [?RA_HOME_DIR]),
-%    ra:restart_server({Name, Node}).
-
 restart() ->
     % open tables in order to force repair 
     % then close them again
@@ -147,7 +168,6 @@ restart() ->
     sbdbs:open_tables(),
     sbdbs:close_tables(),
     {_, CMeta} = ?MODULE:get_cluster_metadata(disk),
-%%%%    restart(node()),
     ra:start_in(?RA_HOME_DIR),
     ra:restart_server({CMeta?SYSTEM.name, node()}),
     ?MODULE:init().
@@ -189,7 +209,7 @@ start_cluster() ->
    sbdbs:close_tables(),
    case Response of
       ok ->
-         Nodes = Cluster#sys_meta.nodes,	
+         Nodes = Cluster?SYSTEM.nodes,	
          % Nodes = ['ra1@localhost', 'ra2@localhost', 'ra3@localhost', 'ra4@localhost'],
          case check_nodes_list(Nodes) of
             ok ->
@@ -202,7 +222,7 @@ start_cluster() ->
                      % see erpc:call for possible improvement
                      [io:format("Initializing node ~s, response: ~p~n", [N, rpc:call(N, ?MODULE, init, [])]) || N <- Nodes],
                      [io:format("Starting Ra on node ~s, response: ~p~n", [N, rpc:call(N, ra, start_in, [?RA_HOME_DIR])]) || N <- Nodes],
-                     Name = Cluster#sys_meta.name,  %ra_cluster,
+                     Name = Cluster?SYSTEM.name,  %ra_cluster,
                      ServerIds = [{Name, N} || N <- Nodes],
                      MachineConf = {module, ?MODULE, #{}},
 		     {Result, Started, NotStarted} = ra:start_cluster(default, Name, MachineConf, ServerIds),
@@ -210,7 +230,11 @@ start_cluster() ->
 		        ok -> 
                            io:format("Cluster started successfully~n"),
 			   io:format("Nodes started ~p~n", [Started]),
-			   io:format("Nodes not started ~p~n", [NotStarted]);
+			   io:format("Nodes not started ~p~n", [NotStarted]),
+			   % TO DO: debug sb:start_cluster() => 
+			   %              sb:stop_cluster() => sb:start_cluster()
+			   %              CRASH (RAM dets not there)
+                           ?MODULE:system_command({set_cluster_state, open});
 			error ->
                            handle_starting_failure("Cluster failed to start on Ra")
 		     end
@@ -228,8 +252,10 @@ handle_starting_failure(Reason) ->
 
 
 stop_cluster() ->
+   ?MODULE:system_command({set_cluster_state, closed}),
    stopping_sequence(),
    cluster_stopped.
+
 
 %to do: check why actually don't stop the server
 stopping_sequence() ->
@@ -238,9 +264,9 @@ stopping_sequence() ->
       no_data -> 
          {error, error_retrieving_metadata};
       _ ->
-         Nodes = Cluster#sys_meta.nodes,
+         Nodes = Cluster?SYSTEM.nodes,
          [io:format("Stopping Ra on node ~s, response: ~p~n", 
-                 [N, rpc:call(N, ra, stop_server, [default, {Cluster#sys_meta.name, N}])]) || N <- Nodes],
+                 [N, rpc:call(N, ra, stop_server, [default, {Cluster?SYSTEM.name, N}])]) || N <- Nodes],
          [rpc:call(N, sbdbs, close_tables, []) || N <- Nodes]
    end.
 
