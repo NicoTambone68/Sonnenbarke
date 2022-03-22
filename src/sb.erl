@@ -220,8 +220,22 @@ start_cluster() ->
 	             handle_starting_failure("You need at least three active nodes to form a cluster");     
                   ok ->
                      % see erpc:call for possible improvement
-                     [io:format("Initializing node ~s, response: ~p~n", [N, rpc:call(N, ?MODULE, init, [])]) || N <- Nodes],
-                     [io:format("Starting Ra on node ~s, response: ~p~n", [N, rpc:call(N, ra, start_in, [?RA_HOME_DIR])]) || N <- Nodes],
+                     [io:format("Initializing node ~s, response: ~p~n",
+		        [N, 
+		           try erpc:call(N, ?MODULE, init, []) of
+		              _ -> ok
+			   catch
+		              _ -> io:format("Initialization of node ~s has failed~n", [N])
+			   end
+		        ]) || N <- Nodes],
+                     [io:format("Starting Ra on node ~s, response: ~p~n", 
+                        [N,
+			   try erpc:call(N, ra, start_in, [?RA_HOME_DIR]) of
+		              _ -> ok
+		           catch
+		              _ -> io:format("Starting Ra on node ~s has failed~n", [N])
+			   end
+                        ]) || N <- Nodes],
                      Name = Cluster?SYSTEM.name,  %ra_cluster,
                      ServerIds = [{Name, N} || N <- Nodes],
                      MachineConf = {module, ?MODULE, #{}},
@@ -257,7 +271,6 @@ stop_cluster() ->
    cluster_stopped.
 
 
-%to do: check why actually don't stop the server
 stopping_sequence() ->
    {_, Cluster} = get_cluster_metadata(ram),
    case Cluster of
@@ -267,7 +280,7 @@ stopping_sequence() ->
          Nodes = Cluster?SYSTEM.nodes,
          [io:format("Stopping Ra on node ~s, response: ~p~n", 
                  [N, rpc:call(N, ra, stop_server, [default, {Cluster?SYSTEM.name, N}])]) || N <- Nodes],
-         [rpc:call(N, sbdbs, close_tables, []) || N <- Nodes]
+         [rpc:call(N, sbsystem, stop, []) || N <- Nodes]
    end.
 
 % Create a new metadata storage 

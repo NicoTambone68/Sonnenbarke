@@ -42,7 +42,8 @@ init(_Args) ->
    end,
    {NewResp, Cluster}.
 
-
+% gentle stop, terminate and close table
+% see handle_cast
 stop() ->
    gen_server:cast(?MODULE, stop).	
 
