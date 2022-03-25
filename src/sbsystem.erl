@@ -15,8 +15,8 @@
    get_cluster_name/0,
    create_cluster_metadata/0,
    update_cluster_metadata/1,
+   update_cluster_metadata/2,
    get_scn/0,
-%   _get_scn/0,
    am_i_leader/0,
    handle_call/3,
    handle_cast/2
@@ -102,6 +102,13 @@ update_cluster_metadata(Scn) ->
    sbdbs:update_cluster_metadata(CMetaUpdated, both),
    {ok, CMetaUpdated}.
 
+% TO DO: change this to a wrapper to sdbs:update_cluster_metadata/2
+% add a new TS with TSName and associated nodes Nodes
+update_cluster_metadata(TSName, Nodes) ->
+   {_, CMeta} = sbdbs:get_cluster_metadata(ram),
+   CMetaUpdated = CMeta?SYSTEM{ts = {TSName,Nodes}},
+   sbdbs:update_cluster_metadata(CMetaUpdated, both),
+   {ok, CMetaUpdated}.
 
 % Create a new metadata storage 
 %  WARNING! Overwrites data
@@ -155,4 +162,5 @@ am_i_leader() ->
    {_, CMeta} = sbdbs:get_cluster_metadata(ram),
    {_, Leader} = ra_leaderboard:lookup_leader(CMeta?SYSTEM.name),
    {Leader == node(), Leader}.
+
 

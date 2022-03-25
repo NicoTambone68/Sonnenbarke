@@ -23,5 +23,9 @@
 		  ra2@localhost,
 		  ra3@localhost,
 		  ra4@localhost
-		 ]}).   		%[string()], list of nodes
+		 ],                    	%[string()], list of nodes
+	 ts       = []                  %[{atom(),[string()]}], list of tuple spaces names 
+	                                %with associated nodes
+
+	}).                             %[string()], list of nodes
 

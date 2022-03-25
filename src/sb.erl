@@ -10,18 +10,13 @@
          init/1, init/0,
          apply/3,
 	 state_enter/2,
-%	 my_effects/2,
 	 system_effects/1,
 	 command_effects/1,
-	 
 
          %% Client api
-%         send_msg/2,
-%	 send_msg2/1,
 	 system_command/1,
 	 command/1,
 	 restart/0,
-%	 restart/1,
 
          %% Cluster management API
 	 create_cluster_metadata/0,
@@ -54,8 +49,6 @@ apply(_Meta, Param, State) ->
 	case Param of
 	   %% System messages 
            {system, Value} ->
-             % io:format("~p Dest: ~p Received system message ~p with state ~p and SCN ~p~n", 
-     	     % [maps:get(system_time, _Meta), From, Value, State, Scn]),
              case Value of
                 {set_cluster_state, ClusterState}
 		 when ClusterState =:= open; ClusterState =:= closed ->
@@ -68,18 +61,12 @@ apply(_Meta, Param, State) ->
 	           Effects = []	   
              end,
 	     {NewState, Reply, Effects};
-%           {send_msg2, Value, Scn} ->
-%             io:format("Received message #2 ~p with state ~p and SCN ~p~n", [Value, State, Scn]),
-%	     Effects = [{mod_call, ?MODULE, my_effects, [State, Scn]}],
-%             {State, ok, Effects};
 	   {command, Value} ->
               io:format("Received command ~p~n", [Value]),
+	      % io:format("Meta ~p~n", [_Meta]),
 	      Effects = [{mod_call, ?MODULE, command_effects, [Value]}],
               {State, ok, Effects}
 	end.
-
-%my_effects(State, Scn) ->
-%   io:format("Effect triggered by system message. Leader: ~p, state: ~p, SCN:~p~n", [node(), State, Scn]).
 
 system_effects(Value) ->
    case Value of
@@ -95,20 +82,29 @@ system_effects(Value) ->
 
 % TO DO: get_scn() only for transactions since it's useless for read-only operations
 command_effects(Value) ->
-   Scn = sbsystem:get_scn(),
-   io:format("Received command: ~p. Now updating followers SCN to ~p~n", [Value, Scn]),
-   {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-   update_followers_metadata(ClusterMetaData).
-   %Nodes = ClusterMetaData?SYSTEM.nodes,
-   % Update metadata on every node of the cluster but the leader node which is already updated 
-%   [io:format("Updating Metadata on node ~p, Result: ~p~n",  
-%   	      [N, 
-%	        try erpc:call(N, ?MODULE, update_cluster_metadata, [ClusterMetaData]) of
-%		   _ -> ok
-%	        catch
-%		   error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
-%		end
-%	      ]) || N <- Nodes, N /= node()].
+   io:format("Received command: ~p~n", [Value]),
+   case Value of
+      {new, Name} -> 
+		     sbts:new(Name),
+		     % TO DO: check if Scn is correctly applied
+                     Scn = sbsystem:get_scn(),
+		     sbsystem:update_cluster_metadata(Scn),
+                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+                     update_followers_metadata(ClusterMetaData),
+                     [{TSName, _} | _ ] = ClusterMetaData?SYSTEM.ts,
+                     % Now create the Tuple Spaces on the Leader Node
+                     sbdbs:open_table(TSName);
+      {out, TS, Tuple} ->	   
+		     sbts:out(TS, Tuple),
+                     Scn = sbsystem:get_scn(),
+		     sbsystem:update_cluster_metadata(Scn),
+                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+                     update_followers_metadata(ClusterMetaData);
+      {rd, TS, Pattern} ->
+		     sbts:rd(TS, Pattern)
+		     % No need to update metadata here bcs nothing has changed
+   end,
+   ok.
 
 
 % TO DO: add parameter Metadata and implement the function
@@ -136,17 +132,6 @@ state_enter(_, _) ->
 
 %% Client api
 
-%% Test Nick
-%send_msg(ServerId, Value) ->
-%    {ok, Result, _Leader} = ra:process_command(ServerId, {send_msg, Value}),
-%     io:format("Current leader is ~p~n", [_Leader]),
-%    Result.
-%
-%send_msg2(Value) ->
-%    ClusterName = sbsystem:get_cluster_name(),
-%    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {send_msg2, Value, 999}),
-%     io:format("Current leader is ~p~n", [_Leader]),
-%    Result.
 
 system_command(Value) ->
     ClusterName = sbsystem:get_cluster_name(),
