@@ -44,7 +44,9 @@ new(Name) ->
 in(TS, Pattern) -> ok.
 
 rd(TS, Pattern) -> 
-   sbdbs:match_ts(TS, Pattern).
+   List = tuple_to_list(Pattern),
+   MatchPattern = list_to_tuple(lists:map(fun(X) -> case X of any -> '_'; _ -> X end end, List)),
+   sbdbs:match_ts(TS, MatchPattern).
 
 out(TS, Tuple) -> 
   {R1, R2} = sbdbs:insert_table(TS, Tuple).
