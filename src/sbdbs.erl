@@ -10,6 +10,7 @@
 	 insert_table/2,
 	 lookup_table/2,
 	 match_ts/2,
+	 match_delete_ts/2,
          update_cluster_metadata/1,
          update_cluster_metadata/2,
 	 get_cluster_metadata/1
@@ -68,6 +69,7 @@ insert_table(TSName, Value) ->
    ?MODULE:open_table(TSName),
    EtsRet  = ets:insert(TSName, Value),
    DetsRet = dets:insert(TSName, Value),
+   ?MODULE:close_table(TSName),
    {EtsRet, DetsRet}.
 
 
@@ -76,19 +78,30 @@ lookup_table(TSName, Pattern) ->
    EtsRet  = dets:lookup(TSName, Pattern),
    % TO DO: load dets into ets at first lookup
    %DetsRet = ets:lookup(TSName, Value),
+   ?MODULE:close_table(TSName),
    {ok, EtsRet}.
 
-
+% return one or more tuples matching the pattern Pattern
 match_ts(TSName, Pattern) ->
    ?MODULE:open_table(TSName),
    EtsRet  = dets:match_object(TSName, Pattern),
+   ?MODULE:close_table(TSName),
    {ok, EtsRet}.
+
+% return one or more tuples matching the pattern Pattern
+% delete the matching pattern from the TS
+match_delete_ts(TSName, Pattern) ->
+   {_, Ret} = ?MODULE:match_ts(TSName, Pattern),
+   ?MODULE:open_table(TSName),
+   dets:match_delete(TSName, Pattern),
+   ?MODULE:close_table(TSName),
+   {ok, Ret}.
 
 % Convert a custom pattern with wildcard 'any'
 % to a pattern to be used with dets:match_object
-translate_pattern(Pattern) ->
-   List = tuple_to_list(Pattern),
-   ok.
+%translate_pattern(Pattern) ->
+%   List = tuple_to_list(Pattern),
+%   ok.
    % TO DO: to be completed
    % e.g.
    % L = tuple_to_list({pippo, pluto, paperino}).

@@ -36,7 +36,10 @@
 %% ra_machine implementation
 
 init(_Config) -> 
+   % sbsystem is a gen_server which handles system's metadata
    sbsystem:start(),
+   % sbts is a gen_server which handles Tuple Spaces
+   sbts:start(),
    [ok]. %#{}.
 
 
@@ -265,7 +268,8 @@ stopping_sequence() ->
          Nodes = Cluster?SYSTEM.nodes,
          [io:format("Stopping Ra on node ~s, response: ~p~n", 
                  [N, rpc:call(N, ra, stop_server, [default, {Cluster?SYSTEM.name, N}])]) || N <- Nodes],
-         [rpc:call(N, sbsystem, stop, []) || N <- Nodes]
+         [rpc:call(N, sbsystem, stop, []) || N <- Nodes],
+         [rpc:call(N, sbts, stop, []) || N <- Nodes]
    end.
 
 % Create a new metadata storage 
