@@ -6,8 +6,9 @@
 	 open_tables/0, 
 	 close_tables/0,
 	 open_table/1,
+	 open_table/2,
 	 close_table/1,
-	 insert_table/2,
+	 insert_ts/2,
 	 lookup_table/2,
 	 match_ts/2,
 	 match_delete_ts/2,
@@ -47,55 +48,88 @@ close_tables() ->
 
 
 % Create Tuple Space TSName
-open_table(TSName) ->
+open_table(TSName, Args) ->
    % build the following filename: .ra/<current_node>/sys_meta.dets	
    {ok, CDHomeDir} = sbenv:get_cluster_env(cluster_datafiles_home_dir),
    FName = atom_to_list(TSName) ++ atom_to_list('.dets'),
    FileName = string:join([CDHomeDir, atom_to_list(node()), FName], "/"),
-   TsRam = ets:whereis(TSName),
-   if TsRam == undefined ->
-      ets:new(TSName, [ordered_set, public, named_table]);
-      true -> ts_ram_already_open
-   end,
-   dets:open_file(TSName, [{file, FileName}, {type, set}]).
+   case filelib:is_file(FileName) of 
+      true ->
+         dets:open_file(TSName, [{file, FileName}, {type, set}]),
+	 {ok, TSName};
+      false ->
+         case Args of 
+            create_if_not_exists ->
+               dets:open_file(TSName, [{file, FileName}, {type, set}]),
+	       {ok, TSName};
+            _ -> erlang:error(file_not_found)
+         end
+   end.
+
+
+open_table(TSName) ->
+   ?MODULE:open_table(TSName, error_if_not_exists).
+
+% To simplify things we are going to manage only disk tables here
+%   TsRam = ets:whereis(TSName),
+%   if TsRam == undefined ->
+%      ets:new(TSName, [ordered_set, public, named_table]);
+%      true -> ts_ram_already_open
+%   end,
+%   dets:open_file(TSName, [{file, FileName}, {type, set}]).
 
 
 close_table(TSName) ->
-   ets:delete(TSName),
+   %ets:delete(TSName),
    dets:close(TSName).
 
 
-insert_table(TSName, Value) ->
-   ?MODULE:open_table(TSName),
-   EtsRet  = ets:insert(TSName, Value),
-   DetsRet = dets:insert(TSName, Value),
-   ?MODULE:close_table(TSName),
-   {EtsRet, DetsRet}.
+insert_ts(TSName, Value) ->
+   try	
+      ?MODULE:open_table(TSName),
+      dets:insert(TSName, Value),
+      ?MODULE:close_table(TSName),
+      {ok, Value}
+   catch
+      error:Error -> {error, Error}
+   end.
 
 
 lookup_table(TSName, Pattern) ->
+  try
    ?MODULE:open_table(TSName),
    EtsRet  = dets:lookup(TSName, Pattern),
    % TO DO: load dets into ets at first lookup
    %DetsRet = ets:lookup(TSName, Value),
    ?MODULE:close_table(TSName),
-   {ok, EtsRet}.
+   {ok, EtsRet}
+  catch
+     error:Error -> {error, Error}
+  end.
 
 % return one or more tuples matching the pattern Pattern
 match_ts(TSName, Pattern) ->
+  try
    ?MODULE:open_table(TSName),
    EtsRet  = dets:match_object(TSName, Pattern),
    ?MODULE:close_table(TSName),
-   {ok, EtsRet}.
+   {ok, EtsRet}
+  catch
+     error:Error -> {error, Error}
+  end.
 
 % return one or more tuples matching the pattern Pattern
 % delete the matching pattern from the TS
 match_delete_ts(TSName, Pattern) ->
+  try
    {_, Ret} = ?MODULE:match_ts(TSName, Pattern),
    ?MODULE:open_table(TSName),
    dets:match_delete(TSName, Pattern),
    ?MODULE:close_table(TSName),
-   {ok, Ret}.
+   {ok, Ret}
+  catch
+     error:Error -> {error, Error}
+  end.
 
 % Convert a custom pattern with wildcard 'any'
 % to a pattern to be used with dets:match_object

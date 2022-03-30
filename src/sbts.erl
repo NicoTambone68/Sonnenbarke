@@ -17,8 +17,6 @@
 	new/1,
 	in/2,
 	rd/2,
-	% delete this (only for test)
-%	rd_/2,
 	out/2,
 	match/1,
 
@@ -55,6 +53,10 @@ new_(Name) ->
    CMetaUpdated = ClusterMetadata?SYSTEM{ts = TS},
    % Save the updated metadata to ram and disk
    sbdbs:update_cluster_metadata(CMetaUpdated, both),
+   % create dets file
+   sbdbs:open_table(Name, create_if_not_exists),
+   % close 
+   sbdbs:close_table(Name),
    {ok, [Name]}.
 
 
@@ -72,9 +74,15 @@ match(InputPattern) ->
    List = tuple_to_list(InputPattern),
    list_to_tuple(lists:map(fun(X) -> case X of any -> '_'; _ -> X end end, List)).
 
-out_(TS, Tuple) -> 
-   sbdbs:insert_table(TS, Tuple),
-   {ok, [Tuple]}.
+out_(TS, Tuple) ->
+      sbdbs:insert_ts(TS, Tuple).
+%   try       	
+%      sbdbs:insert_ts(TS, Tuple)
+%   catch
+%      error:Error -> {error, Error}
+%   end.
+
+%   {ok, [Tuple]}.
 
 % Interface 2/3
 % Tima out in API Call (see below)
@@ -106,15 +114,15 @@ stop() ->
 % thus State must not be changed otherwise
 handle_call(Call, From, State) -> 
    case Call of
-      {new, Name}       -> {ok, List} = new_(Name);
-      {in, TS, Pattern} -> {ok, List} = in_(TS, Pattern);
-      {rd, TS, Pattern} -> {ok, List} = rd_(TS, Pattern);
-      {out, TS, Tuple}  -> {ok, List} = out_(TS, Tuple);
- 	              _ -> {badarg, List} = {badarg, []}
+      {new, Name}       -> {Ret, List} = new_(Name);
+      {in, TS, Pattern} -> {Ret, List} = in_(TS, Pattern);
+      {rd, TS, Pattern} -> {Ret, List} = rd_(TS, Pattern);
+      {out, TS, Tuple}  -> {Ret, List} = out_(TS, Tuple);
+ 	              _ -> {Ret, List} = {badarg, []}
    end,
    case List of
       [] -> {noreply, {no_match, From}};
-       _ -> {reply, List, State}
+       _ -> {reply, {Ret, List}, State}
    end.
 
 
