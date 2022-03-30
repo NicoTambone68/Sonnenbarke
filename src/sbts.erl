@@ -1,4 +1,3 @@
-% Tuple-space management
 -module(sbts).
 -behaviour(gen_server).
 -include("sys_meta.hrl").
@@ -19,7 +18,7 @@
 	in/2,
 	rd/2,
 	% delete this (only for test)
-	rd_/2,
+%	rd_/2,
 	out/2,
 	match/1,
 
@@ -78,8 +77,7 @@ out_(TS, Tuple) ->
    {ok, [Tuple]}.
 
 % Interface 2/3
-in_(TS, Pattern, Timeout) -> ok.
-rd_(TS, Pattern, Timeout) -> ok.
+% Tima out in API Call (see below)
 
 % Interface 3/3
 addNode_(TS, Node) -> ok.
@@ -92,8 +90,9 @@ start() ->
   % Note: the process is registered as global in order for every node to receive
   % the wake up message
   % Sending wake up message: {sbts, 'ra4@localhost'}!wake_up.
-  % gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-  gen_server:start({local, ?MODULE}, ?MODULE, [], []).
+    process_flag(trap_exit, true),
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+%  gen_server:start({local, ?MODULE}, ?MODULE, [], []).
 
 init(_Args) -> {ok, ready}.
 
@@ -103,7 +102,9 @@ stop() ->
    gen_server:cast(?MODULE, stop).	
 
 % handle_call callback function
-handle_call(Call, From, _ ) -> 
+% NOTE: State is used to pass From to the outside
+% thus State must not be changed otherwise
+handle_call(Call, From, State) -> 
    case Call of
       {new, Name}       -> {ok, List} = new_(Name);
       {in, TS, Pattern} -> {ok, List} = in_(TS, Pattern);
@@ -112,27 +113,34 @@ handle_call(Call, From, _ ) ->
  	              _ -> {badarg, List} = {badarg, []}
    end,
    case List of
-      [] -> hibernate(From),
-	    {noreply, List, hibernate}; 
-       _ -> {reply, List, ok}
+      [] -> {noreply, {no_match, From}};
+       _ -> {reply, List, State}
    end.
-%   {reply, List, ok}.
 
-hibernate(From) ->
-   io:format("Pattern doesn't match. Going to hibernation. Ciao~n"),
-   erlang:hibernate(?MODULE, wake_up, [From]).
 
-% TO DO check reasons for cluster crash after wake_up
 wake_up(From) ->
-   io:format("Waking up after hibernation. Ciao ~n"),
-   gen_server:reply(From, {reply, [], ok}).
-% ?MODULE:start().
+   io:format("Waking up after hibernation. Ciao~n"),
+   {no_match, F} = From,
+   gen_server:reply(F, [ok]).
+
 
 handle_info(Info, State) ->
    io:format("Got message ~p~n", [Info]),
+   case Info of
+      new_tuple_in ->
+         case State of
+            {no_match, _} -> wake_up(State);
+                        _ -> ok
+         end;
+	        _ -> ok
+   end,
    {noreply, State}. 
 
+
 handle_cast(stop, State) -> {stop, normal, State}.
+
+
+
 
 % Interface 1
 new(Name) ->
@@ -144,11 +152,31 @@ in(TS, Pattern) ->
 rd(TS, Pattern) ->
    gen_server:call(?MODULE, {rd, TS, Pattern}, infinity).
 
+
 in(TS, Pattern, Timeout) ->
-   gen_server:call(?MODULE, {in, TS, Pattern, Timeout}).
+   %gen_server:call(?MODULE, {in, TS, Pattern}, Timeout).
+   try 
+      Result = gen_server:call(?MODULE, {in, TS, Pattern}, Timeout),
+      {ok, Result}
+   catch Error:Reason -> 
+      case Reason of 
+         {timeout, _} -> {err, timeout};
+	           _  -> {Error, Reason}
+      end
+   end.      
+
 
 rd(TS, Pattern, Timeout) ->
-   gen_server:call(?MODULE, {rd, TS, Pattern, Timeout}).
+   try 
+      Result = gen_server:call(?MODULE, {rd, TS, Pattern}, Timeout),
+      {ok, Result}
+   catch Error:Reason -> 
+      case Reason of 
+         {timeout, _} -> {err, timeout};
+	           _  -> {Error, Reason}
+      end
+   end.      
+
 
 out(TS, Tuple) ->
    gen_server:call(?MODULE, {out, TS, Tuple}).

@@ -96,7 +96,10 @@ command_effects(Value) ->
                      update_followers_metadata(ClusterMetaData),
                      [{TSName, _} | _ ] = ClusterMetaData?SYSTEM.ts,
                      % Now create the Tuple Spaces on the Leader Node
-                     sbdbs:open_table(TSName);
+                     sbdbs:open_table(TSName),
+	             % Broadcast the wake up message to all the cluster's nodes
+	             Nodes = ClusterMetaData?SYSTEM.nodes,
+                     [{sbts, N}!new_tuple_in || N <- Nodes];
       {out, TS, Tuple} ->	   
 		     sbts:out(TS, Tuple),
                      Scn = sbsystem:get_scn(),
