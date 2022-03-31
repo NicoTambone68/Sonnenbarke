@@ -27,8 +27,12 @@
 	% interface 3
 	addNode/2,
 	removeNode/2,
-	nodes/1
+	nodes/1,
 	
+	% TEST delete after test
+	addNode_/2,
+	removeNode_/2,
+	nodes_/1
 	]).
 
 -define(SYSTEM, #sys_meta).
@@ -88,9 +92,65 @@ out_(TS, Tuple) ->
 % Tima out in API Call (see below)
 
 % Interface 3/3
-addNode_(TS, Node) -> ok.
+addNode_(TS, Node) -> 
+ try
+   % get current metadata
+   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
+   % check wheter Node belongs to the cluster or not
+   NodeIsRegistered = lists:member(Node, ClusterMetadata?SYSTEM.nodes), 
+   if NodeIsRegistered == false -> 
+      erlang:error(not_a_cluster_node);
+      true -> ok
+   end,
+   % check wheter Tuple Space TS is already registered into Metadata
+   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
+   if TSisRegistered == false -> 
+      erlang:error(tuple_space_does_not_exist);
+      true -> ok
+   end,
+   % Take TS data from Metadata
+   OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   % Take The list of nodes associated with TS
+   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   % Add the new list of nodes to the TS
+   % TS = [{Name, [Leader]} | ClusterMetadata?SYSTEM.ts],
+   NewTS = {TS, [Node | Nodes]}, %{TS, lists:append(Nodes, Node)},
+   % Remove old TS data from TSList
+   TSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
+   % Add the tuple {TS,[Nodes]} to the TSList
+   NewTSList = [NewTS | TSList], %lists:append(TSList, NewTS),
+   % Store the updated metadata on a peg variable
+   CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
+   % Save the updated metadata to ram and disk
+   sbdbs:update_cluster_metadata(CMetaUpdated, both),
+   % TO DO: replicate TS.dets on the new node
+   {ok, [TS, Node]}
+ catch
+    error:Error -> {error, Error}
+ end.	 
+
+
 removeNode_(TS, Node) -> ok.
-nodes_(TS) -> ok.
+
+nodes_(TS) -> 
+ try
+   % get current metadata
+   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
+   % check wheter Tuple Space TS is already registered into Metadata
+   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
+   if TSisRegistered == false -> 
+      erlang:error(tuple_space_does_not_exist);
+      true -> ok
+   end,
+   % Take The list of nodes associated with TS
+   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   {ok, Nodes}
+ catch
+    error:Error -> {error, Error}
+ end.	 
+
+
+
 
 %gen_server's callbacks
 start() ->
@@ -118,6 +178,7 @@ handle_call(Call, From, State) ->
       {in, TS, Pattern} -> {Ret, List} = in_(TS, Pattern);
       {rd, TS, Pattern} -> {Ret, List} = rd_(TS, Pattern);
       {out, TS, Tuple}  -> {Ret, List} = out_(TS, Tuple);
+	   {nodes, TS}  -> {Ret, List} = nodes_(TS);
  	              _ -> {Ret, List} = {badarg, []}
    end,
    case List of
@@ -155,7 +216,7 @@ new(Name) ->
    gen_server:call(?MODULE, {new, Name}).
 
 in(TS, Pattern) ->
-   gen_server:call(?MODULE, {in, TS, Pattern}).
+   gen_server:call(?MODULE, {in, TS, Pattern}, infinity).
 
 rd(TS, Pattern) ->
    gen_server:call(?MODULE, {rd, TS, Pattern}, infinity).

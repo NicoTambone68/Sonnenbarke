@@ -16,6 +16,7 @@
          %% Client api
 	 system_command/1,
 	 command/1,
+	 broadcast_command/5,
 	 restart/0,
 
          %% Cluster management API
@@ -100,20 +101,40 @@ command_effects(Value) ->
 	             % Broadcast the wake up message to all the cluster's nodes
 	             Nodes = ClusterMetaData?SYSTEM.nodes,
                      [{sbts, N}!new_tuple_in || N <- Nodes];
+
       {out, TS, Tuple} ->	   
 		     sbts:out(TS, Tuple),
                      Scn = sbsystem:get_scn(),
 		     sbsystem:update_cluster_metadata(Scn),
                      {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
                      update_followers_metadata(ClusterMetaData);
+
       {rd, TS, Pattern} ->
-		     sbts:rd(TS, Pattern)
+		     sbts:rd(TS, Pattern);
 		     % No need to update metadata here bcs nothing has changed
+		     %
+      {in, TS, Pattern} ->
+		     %sbts:in(TS, Pattern)
+		     % No need to update metadata here bcs Pattern was deleted nothing has changed
+		     ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, [node()]);
+
+		     _ -> io:format("Invalid command")
    end,
    ok.
 
 
+% Execute Module:Function on the given nodes throgh erpc call
+broadcast_command(Module, Function, Args, Timeout, Nodes) ->
+ io:format("Broadcasting command: ~p~n", [Function]), 
+  try 
+     erpc:multicall(Nodes, Module, Function, Args, Timeout)
+  catch
+     error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
+  end.
+
+
 % TO DO: add parameter Metadata and implement the function
+%        use erpc:multicall instead of erpc:call
 update_followers_metadata(ClusterMetaData) -> 
    % Update metadata on every node of the cluster but the leader node which is already updated 
    % This function must be called solely by the leader through one of the Effects method
