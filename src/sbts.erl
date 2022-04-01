@@ -124,13 +124,49 @@ addNode_(TS, Node) ->
    % Save the updated metadata to ram and disk
    sbdbs:update_cluster_metadata(CMetaUpdated, both),
    % TO DO: replicate TS.dets on the new node
-   {ok, [TS, Node]}
+   {ok, [TS, NewTSList]}
  catch
     error:Error -> {error, Error}
  end.	 
 
 
-removeNode_(TS, Node) -> ok.
+removeNode_(TS, Node) -> 
+ try
+   % get current metadata
+   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
+   % check wheter Node belongs to the cluster or not
+   NodeIsRegistered = lists:member(Node, ClusterMetadata?SYSTEM.nodes), 
+   if NodeIsRegistered == false -> 
+      erlang:error(not_a_cluster_node);
+      true -> ok
+   end,
+   % check wheter Tuple Space TS is already registered into Metadata
+   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
+   if TSisRegistered == false -> 
+      erlang:error(tuple_space_does_not_exist);
+      true -> ok
+   end,
+   % Take TS data from Metadata
+   OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   % Take The list of nodes associated with TS
+   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   % Remove Node from the list of nodes associated with the TS
+   NewNodes = [N || N <- Nodes, N /= Node],
+   % Add the new list of nodes to the TS
+   NewTS = {TS, NewNodes},
+   % Remove old TS data from TSList
+   TSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
+   % Add the tuple {TS,[Nodes]} to the TSList
+   NewTSList = [NewTS | TSList], 
+   % Store the updated metadata on a peg variable
+   CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
+   % Save the updated metadata to ram and disk
+   sbdbs:update_cluster_metadata(CMetaUpdated, both),
+   % TO DO: replicate TS.dets on the new node
+   {ok, [TS, NewTSList]}
+ catch
+    error:Error -> {error, Error}
+ end.	 
 
 nodes_(TS) -> 
  try
@@ -174,10 +210,14 @@ stop() ->
 % thus State must not be changed otherwise
 handle_call(Call, From, State) -> 
    case Call of
+% Interface 1-2	   
       {new, Name}       -> {Ret, List} = new_(Name);
       {in, TS, Pattern} -> {Ret, List} = in_(TS, Pattern);
       {rd, TS, Pattern} -> {Ret, List} = rd_(TS, Pattern);
       {out, TS, Tuple}  -> {Ret, List} = out_(TS, Tuple);
+% Interface 3
+    {addNode, TS, Node} -> {Ret, List} = addNode_(TS, Node);
+ {removeNode, TS, Node} -> {Ret, List} = removeNode_(TS, Node);
 	   {nodes, TS}  -> {Ret, List} = nodes_(TS);
  	              _ -> {Ret, List} = {badarg, []}
    end,

@@ -116,11 +116,44 @@ command_effects(Value) ->
       {in, TS, Pattern} ->
 		     %sbts:in(TS, Pattern)
 		     % No need to update metadata here bcs Pattern was deleted nothing has changed
-		     ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, [node()]);
+		     {Result, Nodes} = sbts:nodes(TS),
+		     case Result of
+		        ok -> ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, Nodes);
+			 _ -> ts_doesnt_exist
+		     end;
+
+      {addNode, TS, Node} ->
+		     {Result, _} = sbts:nodes(TS),
+		     case Result of
+		        ok -> sbts:addNode(TS, Node);
+			 _ -> ts_doesnt_exist
+		     end,
+		     % TO DO: replicate TS datafile to the new node
+		     %        thus copy dets file or recreate the table?
+		     % TO DO: put the following code in update_all_metadata/0
+                     Scn = sbsystem:get_scn(),
+		     sbsystem:update_cluster_metadata(Scn),
+                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+                     update_followers_metadata(ClusterMetaData);
+
+      {removeNode, TS, Node} ->
+		     {Result, _} = sbts:nodes(TS),
+		     case Result of
+		        ok -> sbts:removeNode(TS, Node);
+			 _ -> ts_doesnt_exist
+		     end,
+		     % TO DO: delete the dets datafile from the node
+		     % TO DO: put the following code in update_all_metadata/0
+                     Scn = sbsystem:get_scn(),
+		     sbsystem:update_cluster_metadata(Scn),
+                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+                     update_followers_metadata(ClusterMetaData);
+
+	   {nodes, TS} ->
+		   sbts:nodes(TS);
 
 		     _ -> io:format("Invalid command")
-   end,
-   ok.
+   end.
 
 
 % Execute Module:Function on the given nodes throgh erpc call
