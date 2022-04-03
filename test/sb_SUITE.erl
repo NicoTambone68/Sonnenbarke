@@ -1,4 +1,4 @@
--module(sbts_SUITE).
+-module(sb_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
@@ -11,7 +11,7 @@
 ]).
 
 -export([ 
-	rd_test/1
+	sb_basic_test/1
 	]).
 
 % SUITE callbacks
@@ -19,20 +19,16 @@
 all() -> [{group, public}].
 
 groups() -> [
-	     {public, [shuffle], [rd_test]}
+	     {public, [shuffle], [sb_basic_test]}
 	    ].
 
 
 init_per_suite(public, Config) ->
-	sbsystem:start(),
-	sbts:start(),
 	Config;
 init_per_suite(_, Config) -> Config.
 
 
 end_per_suite(public, _) ->
-	sbts:stop(),
-	sbsystem:stop(),
 	ok;
 end_per_suite(_, _) -> ok.
 
@@ -40,9 +36,8 @@ end_per_suite(_, _) -> ok.
 %
 % public group tests
 
-rd_test(_Config) ->
-	%gen_server:start({local, sbts}, sbts, [], []),
-	sbts:start(),
-	sbts:rd(minnie,{any,any}),
-        sbts:rd(minnie,{pippo,pluto}),
-	ok.
+sb_basic_test(_Config) ->
+   sb:start_cluster(),
+   sb:stop_cluster(),
+   ok.
+
