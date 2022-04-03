@@ -48,7 +48,9 @@ new_(Name) ->
    % get current metadata
    {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
    % get current leader node
-   {_, Leader} = ra_leaderboard:lookup_leader(ClusterMetadata?SYSTEM.name),
+   % {_, Leader} = ra_leaderboard:lookup_leader(ClusterMetadata?SYSTEM.name),
+   % Since new is called exclusively by the Leader, for simplicity we just slap in node() 
+   {_, Leader} = {ok, node()},
    % append the new Tuple Space to the list. Note that the new name is
    % associated with the current leader node by default
    TS = [{Name, [Leader]} | ClusterMetadata?SYSTEM.ts],
