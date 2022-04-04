@@ -8,10 +8,14 @@
 	 open_table/1,
 	 open_table/2,
 	 close_table/1,
+	 delete_table/1,
 	 insert_ts/2,
 	 lookup_table/2,
 	 match_ts/2,
 	 match_delete_ts/2,
+	 scan_ts/1,
+	 scan_ts/2,
+	 traverse/1,
          update_cluster_metadata/1,
          update_cluster_metadata/2,
 	 get_cluster_metadata/1
@@ -83,6 +87,20 @@ close_table(TSName) ->
    %ets:delete(TSName),
    dets:close(TSName).
 
+% phisically deletes datafiles
+delete_table(TSName) ->
+   % build the following filename: .ra/<current_node>/sys_meta.dets	
+   {ok, CDHomeDir} = sbenv:get_cluster_env(cluster_datafiles_home_dir),
+   FName = atom_to_list(TSName) ++ atom_to_list('.dets'),
+   FileName = string:join([CDHomeDir, atom_to_list(node()), FName], "/"),
+   case filelib:is_file(FileName) of 
+      true ->
+         dets:close(TSName),
+	 file:delete(FileName),
+	 {ok, TSName};
+      false -> ok
+   end.
+
 
 insert_ts(TSName, Value) ->
    try	
@@ -131,15 +149,37 @@ match_delete_ts(TSName, Pattern) ->
      error:Error -> {error, Error}
   end.
 
-% Convert a custom pattern with wildcard 'any'
-% to a pattern to be used with dets:match_object
-%translate_pattern(Pattern) ->
-%   List = tuple_to_list(Pattern),
-%   ok.
-   % TO DO: to be completed
-   % e.g.
-   % L = tuple_to_list({pippo, pluto, paperino}).
-   % lists:map(fun(X) -> case X of paperino -> '_'; _ -> X end end, L).
+
+scan_ts(TSName) ->
+   ?MODULE:open_table(TSName),
+   Key = dets:first(TSName),
+   Result = dets:lookup(TSName, Key),
+   %io:format("~p~n", [Result]),
+   %{Result, scan_ts(TSName, Key)}.
+   {Result, Key}.
+
+scan_ts(TSName, Key) ->
+ KeyNext = dets:next(TSName, Key),
+ Result = dets:lookup(TSName, KeyNext),
+ %io:format("~p~n", [Result]),
+ case KeyNext of
+   '$end_of_table' -> {Result, ok};
+                _  -> {Result, KeyNext}
+		% {Result, scan_ts(TSName, KeyNext)}
+ end.
+
+% for debug
+% print out all the content of a TS
+traverse(TSName) ->
+   ?MODULE:open_table(TSName),
+   dets:traverse(TSName, fun(X) -> io:format("~p~n", [X]), continue end),
+   ?MODULE:close_table(TSName).
+
+
+
+
+
+
 
 % test
 % kvets:update_cluster_metadata(#sys_meta{id = 1, status=closed, last_scn=100, nodes=[ra1@localhost, ra2@localhost, ra3@localhost, ra4@localhost]}).

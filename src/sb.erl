@@ -123,13 +123,25 @@ command_effects(Value) ->
 		     end;
 
       {addNode, TS, Node} ->
-		     {Result, _} = sbts:nodes(TS),
+		     {Result, Nodes} = sbts:nodes(TS),
 		     case Result of
 		        ok -> sbts:addNode(TS, Node);
 			 _ -> ts_doesnt_exist
 		     end,
-		     % TO DO: replicate TS datafile to the new node
-		     %        thus copy dets file or recreate the table?
+		     % What if the current Leader doesn't own the TS?
+		     % Take the first node associated with the TS
+		     % to be sure to have a correct reference
+		     % TO DO: round robin to take another node
+		     % if the first associated is down
+		     % ////////////////
+		     NodeFrom = lists:nth(1, Nodes),
+                     % copy_ts replicates TS data of NodeFrom to Node
+		     % by copying record by record through an erpc:call 
+		     copy_ts(TS, NodeFrom, Node),
+		     %////////////////////
+
+		     % delete: replicate TS datafile to the new node
+		     %         thus copy dets file or recreate the table?
 		     % TO DO: put the following code in update_all_metadata/0
                      Scn = sbsystem:get_scn(),
 		     sbsystem:update_cluster_metadata(Scn),
@@ -143,6 +155,9 @@ command_effects(Value) ->
 			 _ -> ts_doesnt_exist
 		     end,
 		     % TO DO: delete the dets datafile from the node
+		     % erpc:call sbdbs:delete_table(TS)
+		     % TO DO: what if we remove the only node? Remove TS as well
+                     erpc:call(Node, sbdbs, delete_table, [TS]),
 		     % TO DO: put the following code in update_all_metadata/0
                      Scn = sbsystem:get_scn(),
 		     sbsystem:update_cluster_metadata(Scn),
@@ -334,4 +349,29 @@ stopping_sequence() ->
 create_cluster_metadata() ->
    sbsystem:create_cluster_metadata().
    
+% Copy TS data from NodeFrom to NodeTo
+copy_ts(TS, NodeFrom, NodeTo) ->
+   sbdbs:open_table(TS),
+   {List, Key} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS]),
+   case List of
+      % TS is empty. Done.
+      [] -> sdbs:close_table(TS),
+	    ok;
+	   % TS is not empty. Copy the first record to the NodeTO
+      _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1,List)]),
+	    % Repeat recursively
+	    copy_ts(TS, NodeFrom, NodeTo, Key)
+   end.
+
+copy_ts(TS, NodeFrom, NodeTo, Key) ->
+   {NextList, NextKey} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS, Key]),
+   case NextList of
+      % TS is empty. Done
+      [] -> sdbs:close_table(),
+	    ok;
+      % TS is not empty. Copy Tuple to Node To
+      _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1, NextList)]),
+	    % Repeat recursively
+	    copy_ts(TS, NodeFrom, NodeTo, NextKey)
+   end.
 
