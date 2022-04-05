@@ -28,6 +28,9 @@
 	addNode/2,
 	removeNode/2,
 	nodes/1,
+
+	% utilities not in system requirements
+	removeTS/1,
 	
 	% TEST delete after test
 	addNode_/2,
@@ -167,8 +170,41 @@ removeNode_(TS, Node) ->
    % TO DO: replicate TS.dets on the new node
    {ok, [TS, NewTSList]}
  catch
-    error:Error -> {error, Error}
+    error:Error -> {error, [Error]}
  end.	 
+
+
+% Remove TS from metadata
+removeTS_(TS) -> 
+ try
+   % get current metadata
+   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
+   % check wheter Tuple Space TS is already registered into Metadata
+   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
+   if TSisRegistered == false -> 
+      erlang:error(tuple_space_does_not_exist);
+      true -> ok
+   end,
+   % Take TS data from Metadata
+   OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   % Take The list of nodes associated with TS and check if it's empty
+   % since it's allowed to remove only TS without associated nodes
+   case [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS] of
+      [] -> ok;
+      _ -> erlang:error(cant_remove_ts_with_nodes)
+   end,
+   % Remove old TS data from TSList
+   NewTSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
+   % Store the updated metadata on a peg variable
+   CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
+   % Save the updated metadata to ram and disk
+   sbdbs:update_cluster_metadata(CMetaUpdated, both),
+   % TO DO: replicate TS.dets on the new node
+   {ok, [NewTSList]}
+ catch
+    error:Error -> {error, [Error]}
+ end.	 
+
 
 nodes_(TS) -> 
  try
@@ -220,7 +256,8 @@ handle_call(Call, From, State) ->
 % Interface 3
     {addNode, TS, Node} -> {Ret, List} = addNode_(TS, Node);
  {removeNode, TS, Node} -> {Ret, List} = removeNode_(TS, Node);
-	   {nodes, TS}  -> {Ret, List} = nodes_(TS);
+	    {nodes, TS} -> {Ret, List} = nodes_(TS);
+         {removeTS, TS} -> {Ret, List} = removeTS_(TS);
  	              _ -> {Ret, List} = {badarg, []}
    end,
    case List of
@@ -300,3 +337,6 @@ removeNode(TS, Node) ->
 
 nodes(TS) ->
    gen_server:call(?MODULE, {nodes, TS}).
+
+removeTS(TS) ->
+   gen_server:call(?MODULE, {removeTS, TS}).

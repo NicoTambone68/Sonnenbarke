@@ -97,20 +97,28 @@ command_effects(Value) ->
                      update_followers_metadata(ClusterMetaData),
                      [{TSName, _} | _ ] = ClusterMetaData?SYSTEM.ts,
                      % Now create the Tuple Spaces on the Leader Node
-                     sbdbs:open_table(TSName),
+		     % TO DO: sbts:create_new_ts(TSName)
+                     sbdbs:open_table(TSName, create_if_not_exists),
+		     sbdbs:close_table(TSName),
 	             % Broadcast the wake up message to all the cluster's nodes
 	             Nodes = ClusterMetaData?SYSTEM.nodes,
-                     [{sbts, N}!new_tuple_in || N <- Nodes];
+                     [{sbts, N}!new_tuple_in || N <- Nodes],
+		     Return = {ok, Name};
 
-      {out, TS, Tuple} ->	   
-		     sbts:out(TS, Tuple),
+      {out, TS, Tuple} ->	  
+		     % Get the list of nodes associated with TS 
+		     {_, Nodes} = sbts:nodes(TS),
+		     % Broadcast command to each node to replicate data
+		     ?MODULE:broadcast_command(sbts, out, [TS, Tuple], infinity, Nodes),
+		     % TO DO: move the following to a standalone function (see other comments)
                      Scn = sbsystem:get_scn(),
 		     sbsystem:update_cluster_metadata(Scn),
                      {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData);
+                     update_followers_metadata(ClusterMetaData),
+		     Return = {ok, TS, Tuple};
 
       {rd, TS, Pattern} ->
-		     sbts:rd(TS, Pattern);
+		     Return = sbts:rd(TS, Pattern);
 		     % No need to update metadata here bcs nothing has changed
 		     %
       {in, TS, Pattern} ->
@@ -118,9 +126,10 @@ command_effects(Value) ->
 		     % No need to update metadata here bcs Pattern was deleted nothing has changed
 		     {Result, Nodes} = sbts:nodes(TS),
 		     case Result of
-		        ok -> ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, Nodes);
-			 _ -> ts_doesnt_exist
-		     end;
+		        ok -> Result = ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, Nodes);
+			 _ -> Result = ts_doesnt_exist
+		     end,
+	             Return = {{in, TS, Pattern}, Result};
 
       {addNode, TS, Node} ->
 		     {Result, Nodes} = sbts:nodes(TS),
@@ -137,6 +146,7 @@ command_effects(Value) ->
 		     NodeFrom = lists:nth(1, Nodes),
                      % copy_ts replicates TS data of NodeFrom to Node
 		     % by copying record by record through an erpc:call 
+		     % TO DO: move to sbts
 		     copy_ts(TS, NodeFrom, Node),
 		     %////////////////////
 
@@ -146,29 +156,37 @@ command_effects(Value) ->
                      Scn = sbsystem:get_scn(),
 		     sbsystem:update_cluster_metadata(Scn),
                      {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData);
+                     update_followers_metadata(ClusterMetaData),
+		     Return = {{addNode, TS, Node}, ok};
 
       {removeNode, TS, Node} ->
-		     {Result, _} = sbts:nodes(TS),
+		     {Result, Nodes} = sbts:nodes(TS),
 		     case Result of
-		        ok -> sbts:removeNode(TS, Node);
+		        ok -> sbts:removeNode(TS, Node),
+			      % remove physical datafile in the given node
+                              erpc:call(Node, sbdbs, delete_table, [TS]),
+		              % What if we remove the only associated node? Remove TS as well
+                              case length(Nodes) of
+                                 1 -> sbts:removeTS(TS);
+                                 _ -> ok
+		              end;
+
 			 _ -> ts_doesnt_exist
 		     end,
-		     % TO DO: delete the dets datafile from the node
-		     % erpc:call sbdbs:delete_table(TS)
-		     % TO DO: what if we remove the only node? Remove TS as well
-                     erpc:call(Node, sbdbs, delete_table, [TS]),
-		     % TO DO: put the following code in update_all_metadata/0
                      Scn = sbsystem:get_scn(),
+		     % TO DO: write_redo_log(scn, command)
+		     % TO DO: put the following code in update_all_metadata/1
 		     sbsystem:update_cluster_metadata(Scn),
                      {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData);
+                     update_followers_metadata(ClusterMetaData),
+		     Return = {{removeNode, TS, Node}, ok};
 
 	   {nodes, TS} ->
-		   sbts:nodes(TS);
+		   Return = sbts:nodes(TS);
 
-		     _ -> io:format("Invalid command")
-   end.
+		     _ -> Return = {invalid_command}
+   end,
+   io:format("~p~n", [Return]).
 
 
 % Execute Module:Function on the given nodes throgh erpc call
@@ -351,13 +369,15 @@ create_cluster_metadata() ->
    
 % Copy TS data from NodeFrom to NodeTo
 copy_ts(TS, NodeFrom, NodeTo) ->
-   sbdbs:open_table(TS),
+   erpc:call(NodeFrom, sbdbs, open_table, [TS]),
+   erpc:call(NodeTo, sbdbs, open_table, [TS, create_if_not_exists]),
    {List, Key} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS]),
    case List of
       % TS is empty. Done.
-      [] -> sdbs:close_table(TS),
+      [] -> erpc:call(NodeFrom, sbdbs, close_table, [TS]),
+	    erpc:call(NodeTo, sbdbs, close_table, [TS]),
 	    ok;
-	   % TS is not empty. Copy the first record to the NodeTO
+      % TS is not empty. Copy the first record to the NodeTO
       _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1,List)]),
 	    % Repeat recursively
 	    copy_ts(TS, NodeFrom, NodeTo, Key)
@@ -367,7 +387,8 @@ copy_ts(TS, NodeFrom, NodeTo, Key) ->
    {NextList, NextKey} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS, Key]),
    case NextList of
       % TS is empty. Done
-      [] -> sdbs:close_table(),
+      [] -> erpc:call(NodeFrom, sbdbs, close_table, [TS]),
+	    erpc:call(NodeTo, sbdbs, close_table, [TS]),
 	    ok;
       % TS is not empty. Copy Tuple to Node To
       _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1, NextList)]),

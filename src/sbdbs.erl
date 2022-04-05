@@ -151,23 +151,30 @@ match_delete_ts(TSName, Pattern) ->
 
 
 scan_ts(TSName) ->
-   ?MODULE:open_table(TSName),
-   Key = dets:first(TSName),
-   Result = dets:lookup(TSName, Key),
-   %io:format("~p~n", [Result]),
-   %{Result, scan_ts(TSName, Key)}.
-   {Result, Key}.
+   try
+      ?MODULE:open_table(TSName),
+      Key = dets:first(TSName),
+      Result = dets:lookup(TSName, Key),
+      %io:format("~p~n", [Result]),
+      %{Result, scan_ts(TSName, Key)}.
+      {Result, Key}
+   catch
+      error:Error -> {error, Error}
+   end.
 
 scan_ts(TSName, Key) ->
- KeyNext = dets:next(TSName, Key),
- Result = dets:lookup(TSName, KeyNext),
- %io:format("~p~n", [Result]),
- case KeyNext of
-   '$end_of_table' -> {Result, ok};
-                _  -> {Result, KeyNext}
-		% {Result, scan_ts(TSName, KeyNext)}
- end.
-
+   try
+      KeyNext = dets:next(TSName, Key),
+      Result = dets:lookup(TSName, KeyNext),
+      %io:format("~p~n", [Result]),
+      case KeyNext of
+        '$end_of_table' -> {Result, ok};
+                     _  -> {Result, KeyNext}
+     		% {Result, scan_ts(TSName, KeyNext)}
+      end
+   catch
+      error:Error -> {error, Error}
+   end.
 % for debug
 % print out all the content of a TS
 traverse(TSName) ->
