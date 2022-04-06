@@ -175,17 +175,17 @@ scan_ts(TSName, Key) ->
    catch
       error:Error -> {error, Error}
    end.
+
 % for debug
 % print out all the content of a TS
 traverse(TSName) ->
-   ?MODULE:open_table(TSName),
-   dets:traverse(TSName, fun(X) -> io:format("~p~n", [X]), continue end),
-   ?MODULE:close_table(TSName).
-
-
-
-
-
+   try
+      ?MODULE:open_table(TSName),
+      dets:traverse(TSName, fun(X) -> io:format("~p~n", [X]), continue end),
+      ?MODULE:close_table(TSName)
+   catch
+      error:Error -> {error, Error}
+   end.
 
 
 % test

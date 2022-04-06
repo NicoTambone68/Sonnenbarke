@@ -184,6 +184,34 @@ command_effects(Value) ->
 	   {nodes, TS} ->
 		   Return = sbts:nodes(TS);
 
+      % /////////////////////////////////////////////////////
+      % 
+      % This is an extra utility out of system specifications
+      %
+      % /////////////////////////////////////////////////////
+      {removeTS, TS} ->
+		     {Result, Nodes} = sbts:nodes(TS),
+		     case Result of
+		        ok ->% Remove all the associated Nodes
+			     [erpc:call(Node, sbts, removeNode, [TS, Node]) || Node <- Nodes],
+			      % remove physical datafile in the given node
+                             [erpc:call(Node, sbdbs, delete_table, [TS]) || Node <- Nodes];
+
+			 _ -> no_associated_nodes
+		     end,
+		     % Remove TS from the System Metadata
+                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+                     ClusterNodes = ClusterMetaData?SYSTEM.nodes,
+                     ?MODULE:broadcast_command(sbts, removeTS, [TS], 5000, ClusterNodes),
+                     % Update system Metadata
+                     Scn = sbsystem:get_scn(),
+		     % TO DO: write_redo_log(scn, command)
+		     % TO DO: put the following code in update_all_metadata/1
+		     sbsystem:update_cluster_metadata(Scn),
+                     {_, ClusterMetaDataUpdated} = sbsystem:get_cluster_metadata(),
+                     update_followers_metadata(ClusterMetaDataUpdated),
+		     Return = {{removeTS, TS}, ok};
+
 		     _ -> Return = {invalid_command}
    end,
    io:format("~p~n", [Return]).

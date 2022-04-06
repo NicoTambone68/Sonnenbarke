@@ -35,6 +35,7 @@
 	% TEST delete after test
 	addNode_/2,
 	removeNode_/2,
+	removeTS_/1,
 	nodes_/1
 	]).
 
@@ -187,11 +188,15 @@ removeTS_(TS) ->
    end,
    % Take TS data from Metadata
    OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   io:format("OldTS ~p~n", [OldTS]),
    % Take The list of nodes associated with TS and check if it's empty
    % since it's allowed to remove only TS without associated nodes
-   case [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS] of
+   %Nodes = lists:nth([S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   {_, Nodes} = OldTS,
+   io:format("Nodes ~p~n", [Nodes]),
+   case Nodes of
       [] -> ok;
-      _ -> erlang:error(cant_remove_ts_with_nodes)
+       _ -> erlang:error(cant_remove_ts_with_nodes)
    end,
    % Remove old TS data from TSList
    NewTSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
@@ -217,10 +222,16 @@ nodes_(TS) ->
       true -> ok
    end,
    % Take The list of nodes associated with TS
-   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
-   {ok, Nodes}
+   List = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   % io:format("List (node_): ~p~n", [List]),
+   case List of
+      [] -> {Ret, Nodes} = {no_associated_nodes, [no_nodes]};
+       _ -> {Ret, Nodes} = {ok, List}
+   end,
+   % old: deleteme Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+   {Ret, Nodes}
  catch
-    error:Error -> {error, Error}
+    error:Error -> {error, [Error]}
  end.	 
 
 
