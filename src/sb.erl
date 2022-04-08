@@ -12,6 +12,9 @@
 	 state_enter/2,
 	 system_effects/1,
 	 command_effects/1,
+	 %
+	 halt/0,
+	 halt/1,
 
          %% Client api
 	 system_command/1,
@@ -69,8 +72,18 @@ apply(_Meta, Param, State) ->
 	   {command, Value} ->
               io:format("Received command ~p~n", [Value]),
 	      % io:format("Meta ~p~n", [_Meta]),
-	      Effects = [{mod_call, ?MODULE, command_effects, [Value]}],
-              {State, ok, Effects}
+	      %Effects = [{mod_call, ?MODULE, command_effects, [Value]}],
+              % command_effects should be called through mod_call through Effects
+	      % but we need to send back Reply, so non blocking effects are called here
+	      %{Response, Result} = ?MODULE:command_effects(Value),
+	      %case Response of
+              %   no_match -> Reply = no_match,
+	      %		      {State, Reply};
+              %         _  -> Reply = Result,
+              %               {State, Reply}
+              %end
+	      {_, Reply} = ?MODULE:command_effects(Value),
+	      {State, Reply}
 	end.
 
 system_effects(Value) ->
@@ -90,7 +103,8 @@ command_effects(Value) ->
    io:format("Received command: ~p~n", [Value]),
    case Value of
       {new, Name} -> 
-		     sbts:new(Name),
+		     Return = sbts:new(Name),
+		     % TO DO: avoid duplicate names
 		     % TO DO: check if Scn is correctly applied
                      Scn = sbsystem:get_scn(),
 		     sbsystem:update_cluster_metadata(Scn),
@@ -102,24 +116,38 @@ command_effects(Value) ->
                      sbdbs:open_table(TSName, create_if_not_exists),
 		     sbdbs:close_table(TSName),
 	             % Broadcast the wake up message to all the cluster's nodes
+		     % this can also be done as effect() [send_msg, ...]
 	             Nodes = ClusterMetaData?SYSTEM.nodes,
                      [{sbts, N}!new_tuple_in || N <- Nodes],
-		     Return = {ok, Name};
+		     Return;
 
       {out, TS, Tuple} ->	  
 		     % Get the list of nodes associated with TS 
-		     {_, Nodes} = sbts:nodes(TS),
-		     % Broadcast command to each node to replicate data
-		     ?MODULE:broadcast_command(sbts, out, [TS, Tuple], infinity, Nodes),
-		     % TO DO: move the following to a standalone function (see other comments)
-                     Scn = sbsystem:get_scn(),
-		     sbsystem:update_cluster_metadata(Scn),
-                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData),
-		     Return = {ok, TS, Tuple};
+		     {Result, Nodes} = sbts:nodes(TS),
+		     case Result of
+ 	                ok ->  % Broadcast command to each node to replicate data
+                               ResultList = ?MODULE:broadcast_command(sbts, out, [TS, Tuple], infinity, Nodes),
+                               case ResultList of
+                                 [] ->  Return = {err, invalid_command};
+
+                                  _ ->  [Head|_] = ResultList,
+					{_, Return} = Head
+			       end,
+         		       % TO DO: move the following to a standalone function (see other comments)
+                               Scn = sbsystem:get_scn(),
+		               sbsystem:update_cluster_metadata(Scn),
+                               {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+                               update_followers_metadata(ClusterMetaData);
+
+			   _ -> Return = {err, ts_doesnt_exist}
+		     end;
 
       {rd, TS, Pattern} ->
-		     Return = sbts:rd(TS, Pattern);
+		     % TO DO: the associated nodes and broadcast command to them
+                     % Note that broadcast_command returns a list containing all the results 
+                     % [{ok,{ok,[{pippo,pluto,paperino}]}}, {ok,{error,file_not_found}}]
+ 
+                     Return = sbts:rd(TS, Pattern);
 		     % No need to update metadata here bcs nothing has changed
 		     %
       {in, TS, Pattern} ->
@@ -127,10 +155,24 @@ command_effects(Value) ->
 		     % No need to update metadata here bcs Pattern was deleted nothing has changed
 		     {Result, Nodes} = sbts:nodes(TS),
 		     case Result of
-		        ok -> Result = ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, Nodes);
-			 _ -> Result = ts_doesnt_exist
+			% TO DO set Timeout instead of infinity just in case a node is down
+			% TO DO write an helper function to extract one correct return among different results
+			% TO DO handle error if all the associated nodes are down   
+		        ok -> ResultList = ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, Nodes),
+			      case ResultList of
+                                 [] ->  Ret = {err, invalid_command};
+
+                                  _ ->  [Head|_] = ResultList,
+					{_, Ret} = Head
+			      end;
+
+			 _ -> Ret = {err, ts_doesnt_exist}
 		     end,
-	             Return = {{in, TS, Pattern}, Result};
+		     case Ret of
+                               {no_match, _} -> Return = {err, no_match};
+                        {ts_doesnt_exist, _} -> Return = {err, ts_doesnt_exist};
+                                           _ -> Return = Ret
+		     end;
 
       {addNode, TS, Node} ->
 		     {Result, Nodes} = sbts:nodes(TS),
@@ -214,8 +256,17 @@ command_effects(Value) ->
 		     Return = {{removeTS, TS}, ok};
 
 		     _ -> Return = {invalid_command}
-   end,
-   io:format("~p~n", [Return]).
+     end,
+     Return.
+     %io:format("~p~n", [Return]).
+
+
+halt() ->
+   sbdbs:halt().
+
+halt(Timeout) ->
+   sbdbs:halt(Timeout).
+
 
 
 % Execute Module:Function on the given nodes throgh erpc call
@@ -263,8 +314,8 @@ system_command(Value) ->
 
 command(Command) ->
     ClusterName = sbsystem:get_cluster_name(),
-    {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {command, Command}),
-    Result.
+    {Result, Reply, _Leader} = ra:process_command({ClusterName, node()}, {command, Command}),
+    {Result, Reply}.
 
 
 % restart after a crash

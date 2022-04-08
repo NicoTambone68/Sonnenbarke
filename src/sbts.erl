@@ -11,6 +11,8 @@
 	handle_call/3,
 	handle_cast/2,
 	handle_info/2,
+	halt/0,
+	halt/1,
 	wake_up/1,
 
 	% interface 1
@@ -269,11 +271,14 @@ handle_call(Call, From, State) ->
  {removeNode, TS, Node} -> {Ret, List} = removeNode_(TS, Node);
 	    {nodes, TS} -> {Ret, List} = nodes_(TS);
          {removeTS, TS} -> {Ret, List} = removeTS_(TS);
+	           halt -> {Ret, List} = {halt, []};
  	              _ -> {Ret, List} = {badarg, []}
    end,
-   case List of
-      [] -> {noreply, {no_match, From}};
-       _ -> {reply, {Ret, List}, State}
+   case {Ret, List} of
+    {halt, _} -> {noreply, {no_match, From}};
+      {_, []} -> {reply, {no_match, From}, State};   %{noreply, {no_match, From}};
+       {_, _} -> {reply, {Ret, List}, State}
+       %{_, _} -> {reply, List, State}
    end.
 
 
@@ -298,7 +303,13 @@ handle_info(Info, State) ->
 
 handle_cast(stop, State) -> {stop, normal, State}.
 
+% Suspend execution with explicit call to methods
 
+halt() ->
+   gen_server:call(?MODULE, halt, infinity).
+
+halt(Timeout) ->
+   gen_server:call(?MODULE, halt, Timeout).
 
 
 % Interface 1

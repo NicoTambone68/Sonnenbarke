@@ -13,7 +13,8 @@
 
 -export([ 
 	sb_basic_test/1,
-	sb_metadata_test/1
+	sb_metadata_test/1,
+        sb_interface_1_test/1
 	]).
 
 % SUITE callbacks
@@ -21,7 +22,10 @@
 all() -> [{group, public}].
 
 groups() -> [
-	     {public, [shuffle], [sb_basic_test, sb_metadata_test]}
+	     {public, [shuffle], [sb_basic_test,
+				  sb_metadata_test,
+				  sb_interface_1_test
+				 ]}
 	    ].
 
 
@@ -58,3 +62,24 @@ sb_metadata_test(_Config) ->
    sb:stop_cluster(),
    ok.
 
+% interface #1 general test
+sb_interface_1_test(_Config) ->
+   % start
+   sb:start_cluster(),
+   % create a new tuple space
+%   sb:command({new, my_awesome_ts}),
+   % populate the ts with random data
+%   sb:command({out, my_awesome_ts, {a,b,c,d}}),
+%   sb:command({out, my_awesome_ts, {ab,cd,ef}}),
+%   sb:command({out, my_awesome_ts, {abc,def,ghi}}),
+%   sb:command({out, my_awesome_ts, {abcd,efgh,ijkl}}),
+   % read data
+   ?assertMatch({ok, [{a,b,c,d}]}, sb:command({rd, my_awesome_ts, {a,b,c,d}})),
+   ?assertMatch({ok, [{ab,cd,ef}]}, sb:command({rd, my_awesome_ts, {ab,cd,ef}})),
+   ?assertMatch({ok, [{abc,def,ghi}]}, sb:command({rd, my_awesome_ts, {abc,def,ghi}})),
+   ?assertMatch({ok, [{abcd,efgh,ijkl}]}, sb:command({rd, my_awesome_ts, {abcd,efgh,ijkl}})),
+% TO DO
+   % read data with cancellation
+   %
+   sb:stop_cluster(),
+   ok.
