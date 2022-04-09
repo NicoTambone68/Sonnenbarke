@@ -11,7 +11,14 @@
 	 out/2,
 
 	 % Interface 2
-	 rd/3
+	 in/3,
+	 rd/3,
+
+         % Interface 3
+	 addNode/2,
+	 removeNode/2,
+	 nodes/1
+
        ]).
 
 % TO DO: check cluster status
@@ -22,8 +29,7 @@ connect() -> {ok}.
 
 new(TS) ->
    try
-      Ret = sb:command({new, TS}),
-      Ret
+      sb:command({new, TS})
    catch Error:Reason ->
       case Reason of
          {ts_name_already_exists} -> {err, Reason};
@@ -32,20 +38,18 @@ new(TS) ->
    end.
 
 in(TS, Pattern) ->
-   {_, Ret} =  sb:command({in, TS, Pattern}),
-   case Ret of
-     no_match -> sbts:halt();
-           _ -> ok
-   end,
-   Ret.
+   match_pattern(TS, Pattern, in).	
 
 rd(TS, Pattern) ->
-   {_, Ret} =  sb:command({rd, TS, Pattern}),
+  match_pattern(TS, Pattern, rd).
+
+% Function atom() rd | in
+match_pattern(TS, Pattern, Function) ->
+   {_, {Ret, Match}} =  sb:command({Function, TS, Pattern}),
    case Ret of
      no_match -> sbts:halt();
-           _ -> ok
-   end,
-   Ret.
+            _ -> Match
+   end.
 
 
 out(TS, Tuple) ->
@@ -54,17 +58,35 @@ out(TS, Tuple) ->
 % Interface 2
 
 rd(TS, Pattern, Timeout) ->
+   match_pattern_timeout(TS, Pattern, Timeout, rd).
+
+in(TS, Pattern, Timeout) ->
+   match_pattern_timeout(TS, Pattern, Timeout, in).
+
+%	
+match_pattern_timeout(TS, Pattern, Timeout, Function) ->
    try	
-      {_, Ret} =  sb:command({rd, TS, Pattern}),
+      {_, {Ret, Match}} =  sb:command({Function, TS, Pattern}),
       case Ret of
         no_match -> sbts:halt(Timeout);
-               _ -> ok
-      end,
-   Ret
+               _ -> Match
+      end
    catch Error:Reason ->
       case Reason of 
          {timeout, _} -> {err, timeout};
 	           _  -> {Error, Reason}
       end
    end.
+
+
+% Interface 3
+
+addNode(TS, Node) ->
+   sb:command({addNode, TS, Node}).
+
+removeNode(TS, Node) ->
+   sb:command({removeNode, TS, Node}).
+
+nodes(TS) ->
+   sb:command({nodes, TS}).
 

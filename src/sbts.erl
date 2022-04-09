@@ -283,9 +283,9 @@ handle_call(Call, From, State) ->
 
 
 wake_up(From) ->
-   io:format("Waking up after hibernation. Ciao~n"),
+   io:format("Waking up after block. Ciao~n"),
    {no_match, F} = From,
-   gen_server:reply(F, [ok]).
+   gen_server:reply(F, ok).
 
 
 handle_info(Info, State) ->

@@ -82,7 +82,12 @@ apply(_Meta, Param, State) ->
               %         _  -> Reply = Result,
               %               {State, Reply}
               %end
-	      {_, Reply} = ?MODULE:command_effects(Value),
+	      Reply = ?MODULE:command_effects(Value),
+%	      case Ret of
+%                       {ok, _} -> {_, Reply} = Ret;
+%		 {no_match, _} -> Reply = Ret
+%	      end,
+	      % {_, Reply} = ?MODULE:command_effects(Value),
 	      {State, Reply}
 	end.
 
