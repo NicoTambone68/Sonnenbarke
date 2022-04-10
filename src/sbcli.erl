@@ -3,6 +3,9 @@
 -export([
 	 % Client functions
 	 connect/0,
+	 start/0,
+	 stop/0,
+	 metadata/0,
 
 	 % Interface 1
 	 new/1,
@@ -21,15 +24,31 @@
 
        ]).
 
+% Client utilities
 % TO DO: check cluster status
 % ok when connect is successf.
 connect() -> {ok}.
+
+start() ->
+   sb:start_cluster().
+
+stop() ->
+   sb:stop_cluster().	
+
+metadata() ->
+   sb:get_cluster_metadata(ram).
 
 % Interface 1
 
 new(TS) ->
    try
-      sb:command({new, TS})
+     {_, Nodes} = sbts:nodes(TS),
+     % New TS only if it doesn't exist
+     % otherwise use method AddNode
+     case Nodes of
+        [tuple_space_does_not_exist] -> sb:command({new, TS, node()});
+                                   _ -> {err, ts_name_already_exists}
+     end
    catch Error:Reason ->
       case Reason of
          {ts_name_already_exists} -> {err, Reason};

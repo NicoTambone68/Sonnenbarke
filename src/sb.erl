@@ -26,6 +26,7 @@
 	 create_cluster_metadata/0,
 	 get_cluster_metadata/1,
 	 update_cluster_metadata/1,
+	 update_all_metadata/0,
          start_cluster/0,
 	 stop_cluster/0
         ]).
@@ -83,12 +84,15 @@ apply(_Meta, Param, State) ->
               %               {State, Reply}
               %end
 	      Reply = ?MODULE:command_effects(Value),
-%	      case Ret of
-%                       {ok, _} -> {_, Reply} = Ret;
-%		 {no_match, _} -> Reply = Ret
-%	      end,
-	      % {_, Reply} = ?MODULE:command_effects(Value),
-	      {State, Reply}
+	      % Any command wich modifies data must update metadata
+	      % This is done by the Leader through Effects
+	      Command = lists:nth(1, tuple_to_list(Value)),
+	      case lists:member(Command, [new, in, out, 'addNode', 'removeNode']) of
+		      true  -> Effects = [{mod_call, ?MODULE, update_all_metadata, []}],
+			       {State, Reply, Effects};
+
+		      false -> {State, Reply}
+	      end
 	end.
 
 system_effects(Value) ->
@@ -103,109 +107,86 @@ system_effects(Value) ->
       _ -> {error, invalid_system_effect_parameter}
    end.	   
 
+% system utility: updates Leader and followers metadata after a transaction
+update_all_metadata() ->
+   Scn = sbsystem:get_scn(),
+   {_, ClusterMetaData} = sbsystem:update_cluster_metadata(Scn),
+   % superfluo delete {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+   update_followers_metadata(ClusterMetaData).
+
 % TO DO: get_scn() only for transactions since it's useless for read-only operations
 command_effects(Value) ->
    io:format("Received command: ~p~n", [Value]),
    case Value of
-      {new, Name} -> 
-		     Return = sbts:new(Name),
-		     % TO DO: avoid duplicate names
-		     % TO DO: check if Scn is correctly applied
-                     Scn = sbsystem:get_scn(),
-		     sbsystem:update_cluster_metadata(Scn),
-                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData),
-                     [{TSName, _} | _ ] = ClusterMetaData?SYSTEM.ts,
-                     % Now create the Tuple Spaces on the Leader Node
-		     % TO DO: sbts:create_new_ts(TSName)
-                     sbdbs:open_table(TSName, create_if_not_exists),
-		     sbdbs:close_table(TSName),
-	             % Broadcast the wake up message to all the cluster's nodes
-		     % this can also be done as effect() [send_msg, ...]
-	             Nodes = ClusterMetaData?SYSTEM.nodes,
-                     [{sbts, N}!new_tuple_in || N <- Nodes],
-		     Return;
+      {new, Name, Node} -> 
+		     % Create a new TS Name on Node
+                     {_, Nodes} = sbts:nodes(Name),
+		     case Nodes of
+			% new TS only if it doesn't already exist on Node     
+			% first case is a brand new ts
+                        [tuple_space_does_not_exist] -> Action = new_name_node;
+                        % second case: ts already exists. we're going to check if it's on Node or not
+                                                   _ -> case lists:member(Node, Nodes) of
+								true -> Action = nothing_to_do;
+						               false -> Action = new_name_node
+							end
+                      end,            
+                      % Execute only if node() == Node and the tests above say go
+		      case (Action =:= new_name_node) and (node() =:= Node)  of
+                              true -> Return = sbts:new(Name, Node);
 
-      {out, TS, Tuple} ->	  
-		     % Get the list of nodes associated with TS 
-		     {Result, Nodes} = sbts:nodes(TS),
-		     case Result of
- 	                ok ->  % Broadcast command to each node to replicate data
-                               ResultList = ?MODULE:broadcast_command(sbts, out, [TS, Tuple], infinity, Nodes),
-                               case ResultList of
-                                 [] ->  Return = {err, invalid_command};
+                                 _ -> Return =  ok
+                      end;
 
-                                  _ ->  [Head|_] = ResultList,
-					{_, Return} = Head
-			       end,
-         		       % TO DO: move the following to a standalone function (see other comments)
-                               Scn = sbsystem:get_scn(),
-		               sbsystem:update_cluster_metadata(Scn),
-                               {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                               update_followers_metadata(ClusterMetaData);
+			     
 
-			   _ -> Return = {err, ts_doesnt_exist}
-		     end;
+      {out, TS, Tuple} ->	 
+         Return = interface_1(out, TS, Tuple);
+
 
       {rd, TS, Pattern} ->
-		     % TO DO: the associated nodes and broadcast command to them
-                     % Note that broadcast_command returns a list containing all the results 
-                     % [{ok,{ok,[{pippo,pluto,paperino}]}}, {ok,{error,file_not_found}}]
- 
-                     Return = sbts:rd(TS, Pattern);
-		     % No need to update metadata here bcs nothing has changed
-		     %
+         Return = interface_1(rd, TS, Pattern);
+
+
       {in, TS, Pattern} ->
-		     %sbts:in(TS, Pattern)
-		     % No need to update metadata here bcs Pattern was deleted nothing has changed
-		     {Result, Nodes} = sbts:nodes(TS),
-		     case Result of
-			% TO DO set Timeout instead of infinity just in case a node is down
-			% TO DO write an helper function to extract one correct return among different results
-			% TO DO handle error if all the associated nodes are down   
-		        ok -> ResultList = ?MODULE:broadcast_command(sbts, in, [TS, Pattern], infinity, Nodes),
-			      case ResultList of
-                                 [] ->  Ret = {err, invalid_command};
+         Return = interface_1(in, TS, Pattern);
 
-                                  _ ->  [Head|_] = ResultList,
-					{_, Ret} = Head
-			      end;
-
-			 _ -> Ret = {err, ts_doesnt_exist}
-		     end,
-		     case Ret of
-                               {no_match, _} -> Return = {err, no_match};
-                        {ts_doesnt_exist, _} -> Return = {err, ts_doesnt_exist};
-                                           _ -> Return = Ret
-		     end;
 
       {addNode, TS, Node} ->
-		     {Result, Nodes} = sbts:nodes(TS),
-		     case Result of
-		        ok -> sbts:addNode(TS, Node);
-			 _ -> ts_doesnt_exist
-		     end,
+		     {_, Nodes} = sbts:nodes(TS),
+		     case Nodes of
+		        [tuple_space_does_not_exist] ->
+                              sbts:new(TS, Node),    %sbts:addNode(TS, Node);
+                              % NodeFrom = lists:nth(1, Nodes),
+                              % copy_ts(TS, NodeFrom, Node),
+                              Return = {{addNode, TS, Node}, ok};
+                        
+			 % TS already on cluster. Add Node if not a member of the TS
+			 _ -> case lists:member(Node, Nodes) of
+                                 true -> Return = {{addNode, TS, Node}, ok};
+
+				false -> sbts:new(TS, Node),
+					 % Note that the new node is added to the Head of the list
+					 % so take care to pick the last element to copy from
+                                         NodeFrom = lists:last(Nodes),
+                                         copy_ts(TS, NodeFrom, Node),
+                                         Return = {{addNode, TS, Node}, ok}
+			      end 
+		     end;
 		     % What if the current Leader doesn't own the TS?
 		     % Take the first node associated with the TS
 		     % to be sure to have a correct reference
 		     % TO DO: round robin to take another node
 		     % if the first associated is down
 		     % ////////////////
-		     NodeFrom = lists:nth(1, Nodes),
                      % copy_ts replicates TS data of NodeFrom to Node
 		     % by copying record by record through an erpc:call 
 		     % TO DO: move to sbts
-		     copy_ts(TS, NodeFrom, Node),
 		     %////////////////////
 
 		     % delete: replicate TS datafile to the new node
 		     %         thus copy dets file or recreate the table?
 		     % TO DO: put the following code in update_all_metadata/0
-                     Scn = sbsystem:get_scn(),
-		     sbsystem:update_cluster_metadata(Scn),
-                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData),
-		     Return = {{addNode, TS, Node}, ok};
 
       {removeNode, TS, Node} ->
 		     {Result, Nodes} = sbts:nodes(TS),
@@ -272,6 +253,29 @@ halt() ->
 halt(Timeout) ->
    sbdbs:halt(Timeout).
 
+
+interface_1(Function, TS, Tuple) ->
+   % Get the list of nodes associated with TS 
+   {Result, Nodes} = sbts:nodes(TS),
+   case Result of
+      ok ->  % Execute only on associate nodes
+             case lists:member(node(), Nodes) of
+                true -> Return = sbts:Function(TS, Tuple),
+			% out must send wake up signal new_tuple_in
+			case Function of
+				out -> {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+				       ClusterNodes = ClusterMetaData?SYSTEM.nodes,
+                                       [{sbts, N}!new_tuple_in || N <- ClusterNodes];
+
+                                  _ -> ok
+			end;
+
+               false -> Return = {ok, no_action}
+             end;
+
+      _ -> Return = {err, ts_doesnt_exist}
+   end,
+   Return.
 
 
 % Execute Module:Function on the given nodes throgh erpc call

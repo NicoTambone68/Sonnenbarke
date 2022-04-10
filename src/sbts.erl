@@ -16,7 +16,7 @@
 	wake_up/1,
 
 	% interface 1
-	new/1,
+	new/2,
 	in/2,
 	rd/2,
 	out/2,
@@ -44,32 +44,58 @@
 -define(SYSTEM, #sys_meta).
 
 
-%TO DO: implement
-%
-% TO DO: First time you create a TS the default associated node is 
-% the one requesting the new TS. Other nodes can be added later on
-% with the given API
-new_(Name) -> 
+new_(Name, Node) -> 
    % register the new TS in the system's metadata table
    % get current metadata
    {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
    % get current leader node
-   % {_, Leader} = ra_leaderboard:lookup_leader(ClusterMetadata?SYSTEM.name),
-   % Since new is called exclusively by the Leader, for simplicity we just slap in node() 
-   {_, Leader} = {ok, node()},
-   % append the new Tuple Space to the list. Note that the new name is
-   % associated with the current leader node by default
-   TS = [{Name, [Leader]} | ClusterMetadata?SYSTEM.ts],
-   % TS = lists:append(ClusterMetadata?SYSTEM.ts, {Name, [Leader]}),
+   % This was originally intended to be Leader, for simplicity we actually just use node() 
+   % Leader = node(),
+
+   % Chek if Name Node already exist
+   %
+   TSList = ClusterMetadata?SYSTEM.ts,
+   % Get all TSNames from TSList
+   % [N || {N,_} <- TSList]
+   case lists:member(Name, [N || {N,_} <- TSList]) of
+	   % Name is already there. Check the associated nodes
+	   true -> [{Name, AN}] = [{N,L} || {N,L} <- TSList, N == Name],
+                   case lists:member(Node, AN) of
+                       % Name and node already there. nothing to do.
+                       true -> Action = nothing_to_do;
+                      % Name is already there, but not the node
+                      false -> Action = add_node_only
+		   end;
+           % Name and node must be inserted
+	   false -> Action = add_name_and_node
+   end,
+
+   case Action of
+      add_name_and_node -> TS = [{Name, [Node]} | ClusterMetadata?SYSTEM.ts],
+                           % create dets file
+                           sbdbs:open_table(Name, create_if_not_exists),
+                           % close 
+                           sbdbs:close_table(Name),
+			   Return = {ok, [Name, Node]};
+
+          add_node_only -> [{Name, ANodes}] = [{N,L} || {N,L} <- TSList, N == Name],
+		           TS = [{Name, [Node|ANodes]} | lists:delete({Name, ANodes}, ClusterMetadata?SYSTEM.ts)],
+                           % create dets file
+                           sbdbs:open_table(Name, create_if_not_exists),
+                           % close 
+                           sbdbs:close_table(Name),
+			   Return = {ok, [Name, Node]};
+
+          nothing_to_do -> TS = ClusterMetadata?SYSTEM.ts,
+		           Return = {ok, [ts_already_exists]}
+   end,
+
+   % Update Cluster Metadata 
    % Store the updated metadata on a peg variable
    CMetaUpdated = ClusterMetadata?SYSTEM{ts = TS},
    % Save the updated metadata to ram and disk
    sbdbs:update_cluster_metadata(CMetaUpdated, both),
-   % create dets file
-   sbdbs:open_table(Name, create_if_not_exists),
-   % close 
-   sbdbs:close_table(Name),
-   {ok, [Name]}.
+   Return.
 
 
 in_(TS, Pattern) -> 
@@ -262,7 +288,7 @@ stop() ->
 handle_call(Call, From, State) -> 
    case Call of
 % Interface 1-2	   
-      {new, Name}       -> {Ret, List} = new_(Name);
+      {new, Name, Node} -> {Ret, List} = new_(Name, Node);
       {in, TS, Pattern} -> {Ret, List} = in_(TS, Pattern);
       {rd, TS, Pattern} -> {Ret, List} = rd_(TS, Pattern);
       {out, TS, Tuple}  -> {Ret, List} = out_(TS, Tuple);
@@ -313,8 +339,8 @@ halt(Timeout) ->
 
 
 % Interface 1
-new(Name) ->
-   gen_server:call(?MODULE, {new, Name}).
+new(Name, Node) ->
+   gen_server:call(?MODULE, {new, Name, Node}).
 
 in(TS, Pattern) ->
    gen_server:call(?MODULE, {in, TS, Pattern}, infinity).
