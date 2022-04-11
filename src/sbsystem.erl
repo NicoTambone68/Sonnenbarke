@@ -126,13 +126,18 @@ create_cluster_metadata() ->
    % The path structure is: cluster_datafiles_home_dir/node_name
    CDHomeDirNode = lists:concat([CDHomeDir, "/", node()]),
    case filelib:is_dir(CDHomeDirNode) of
-	   false -> file:make_dir(CDHomeDirNode);
+	   % Note that with file library missing parent directories are not created
+	   false -> file:make_dir(CDHomeDir),
+		    file:make_dir(CDHomeDirNode);
+
 	   true -> ok
    end,
    % Same story for the .ra home directory
    RaHomeDirNode = lists:concat([RaHomeDir, "/", node()]),
    case filelib:is_dir(RaHomeDirNode) of
-	   false -> file:make_dir(RaHomeDirNode);
+	  false -> file:make_dir(RaHomeDir), 
+		   file:make_dir(RaHomeDirNode);
+
 	   true -> ok
    end,
    % New Metadata Record w default values

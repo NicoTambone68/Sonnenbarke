@@ -6,6 +6,7 @@
 	 start/0,
 	 stop/0,
 	 metadata/0,
+	 create_cluster_metadata/0,
 
 	 % Interface 1
 	 new/1,
@@ -37,6 +38,19 @@ stop() ->
 
 metadata() ->
    sb:get_cluster_metadata(ram).
+
+% initialize new metadata on all nodes
+% based on sys.config
+% create directories if not exist 
+% 
+create_cluster_metadata() ->
+   {ok,L} = application:get_env(system_metadata, cluster),
+   [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, L),
+   try                                                                                                                                       
+      erpc:multicall(Nodes, sbsystem, create_cluster_metadata, [], 1000)                                                                                 
+   catch                                                                                                                                     
+      error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])                                                                  
+   end.     
 
 % Interface 1
 

@@ -196,7 +196,6 @@ removeNode_(TS, Node) ->
    CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
    % Save the updated metadata to ram and disk
    sbdbs:update_cluster_metadata(CMetaUpdated, both),
-   % TO DO: replicate TS.dets on the new node
    {ok, [TS, NewTSList]}
  catch
     error:Error -> {error, [Error]}

@@ -192,22 +192,21 @@ command_effects(Value) ->
 		     {Result, Nodes} = sbts:nodes(TS),
 		     case Result of
 		        ok -> sbts:removeNode(TS, Node),
-			      % remove physical datafile in the given node
-                              erpc:call(Node, sbdbs, delete_table, [TS]),
-		              % What if we remove the only associated node? Remove TS as well
-                              case length(Nodes) of
-                                 1 -> sbts:removeTS(TS);
-                                 _ -> ok
-		              end;
+			      % remove physical datafile 
+			      % delete it only in the given Node
+			      case node() of
+                                 Node -> sbdbs:delete_table(TS),
+		                         % What if we remove the only associated node? Remove TS as well
+                                         case length(Nodes) of
+                                            1 -> sbts:removeTS(TS);
+                                            _ -> ok
+		                          end;
+
+				      _ -> nothing_to_do
+			      end;
 
 			 _ -> ts_doesnt_exist
 		     end,
-                     Scn = sbsystem:get_scn(),
-		     % TO DO: write_redo_log(scn, command)
-		     % TO DO: put the following code in update_all_metadata/1
-		     sbsystem:update_cluster_metadata(Scn),
-                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaData),
 		     Return = {{removeNode, TS, Node}, ok};
 
 	   {nodes, TS} ->
