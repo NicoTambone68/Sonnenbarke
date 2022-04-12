@@ -7,6 +7,7 @@
 	 stop/0,
 	 metadata/0,
 	 create_cluster_metadata/0,
+	 set_leader/1,
 
 	 % Interface 1
 	 new/1,
@@ -38,6 +39,11 @@ stop() ->
 
 metadata() ->
    sb:get_cluster_metadata(ram).
+
+set_leader(Node) ->
+   ClusterName = sbsystem:get_cluster_name(),
+   {_, Leader} = ra_leaderboard:lookup_leader(ClusterName),
+   ra:transfer_leadership({ClusterName, Leader}, {ClusterName, Node}).
 
 % initialize new metadata on all nodes
 % based on sys.config

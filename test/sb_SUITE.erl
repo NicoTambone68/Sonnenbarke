@@ -150,10 +150,14 @@ sb_interface_3_test(_Config) ->
    ?assertMatch(true, ?MODULE:datafile_exists(TS, node())),
 
    sbcli:addNode(TS, ra1@localhost),
+   
+   timer:sleep(1000),
 
    ?assertMatch(true, ?MODULE:datafile_exists(TS, ra1@localhost)),
 
    sbcli:removeNode(TS, ra1@localhost),
+   
+   timer:sleep(1000),
 
    ?assertMatch(false, ?MODULE:datafile_exists(TS, ra1@localhost)),
 
@@ -165,8 +169,4 @@ datafile_exists(TSName, Node) ->
    {ok, CDHomeDir} = sbenv:get_cluster_env(cluster_datafiles_home_dir),                                                                     
    FName = atom_to_list(TSName) ++ atom_to_list('.dets'),                                                                                   
    FileName = string:join([CDHomeDir, atom_to_list(Node), FName], "/"),
-   Result = file:read_file_info(FileName),
-   case Result of
-      {ok, _} -> true;
-	    _ -> false
-   end.
+   filelib:is_regular(FileName).

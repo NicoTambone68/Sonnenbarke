@@ -111,7 +111,6 @@ system_effects(Value) ->
 update_all_metadata() ->
    Scn = sbsystem:get_scn(),
    {_, ClusterMetaData} = sbsystem:update_cluster_metadata(Scn),
-   % superfluo delete {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
    update_followers_metadata(ClusterMetaData).
 
 % TO DO: get_scn() only for transactions since it's useless for read-only operations
