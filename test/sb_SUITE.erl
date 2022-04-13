@@ -17,6 +17,7 @@
         sb_interface_1_test/1,
         sb_interface_2_test/1,
         sb_interface_3_test/1,
+	sb_cluster_test/1,
 	datafile_exists/2
 	]).
 
@@ -25,11 +26,13 @@
 all() -> [{group, public}].
 
 groups() -> [
-	     {public, [shuffle], [sb_basic_test,
-				  sb_metadata_test,
-				  sb_interface_1_test,
-				  sb_interface_2_test,
-				  sb_interface_3_test
+	     {public, [shuffle], [
+%				  sb_basic_test,
+%				  sb_metadata_test,
+%				  sb_interface_1_test,
+%				  sb_interface_2_test,
+%				  sb_interface_3_test,
+				  sb_cluster_test
 				 ]}
 	    ].
 
@@ -140,6 +143,15 @@ sb_interface_3_test(_Config) ->
    % start
    sbcli:start(),
 
+   % get the Fully Qualified Domain Name
+   {ok, FQDN} = net_adm:dns_hostname(net_adm:localhost()),
+
+   % Node names
+    Node1  = list_to_atom(atom_to_list('ra1@') ++ FQDN),
+   %Node2  = list_to_atom(atom_to_list('ra2@') ++ FQDN),
+   %Node3  = list_to_atom(atom_to_list('ra3@') ++ FQDN),
+   %Node4  = list_to_atom(atom_to_list('ra4@') ++ FQDN),
+
    timer:sleep(2000),
 
    TS = adcc,
@@ -147,23 +159,99 @@ sb_interface_3_test(_Config) ->
    % create a new tuple space
    sbcli:new(TS),
 
+   % it is supposed node() is the Leader node
    ?assertMatch(true, ?MODULE:datafile_exists(TS, node())),
 
-   sbcli:addNode(TS, ra1@localhost),
+   sbcli:addNode(TS, Node1),
    
    timer:sleep(1000),
 
-   ?assertMatch(true, ?MODULE:datafile_exists(TS, ra1@localhost)),
+   ?assertMatch(true, ?MODULE:datafile_exists(TS, Node1)),
 
-   sbcli:removeNode(TS, ra1@localhost),
+   sbcli:removeNode(TS, Node1),
    
    timer:sleep(1000),
 
-   ?assertMatch(false, ?MODULE:datafile_exists(TS, ra1@localhost)),
+   ?assertMatch(false, ?MODULE:datafile_exists(TS, Node1)),
 
    % stop
    sbcli:stop(),
    ok.
+
+
+sb_cluster_test(_Config) ->
+
+   % get the Fully Qualified Domain Name
+   {ok, FQDN} = net_adm:dns_hostname(net_adm:localhost()),
+
+   % Node names
+    Node1  = list_to_atom(atom_to_list('ra1@') ++ FQDN),
+    %Node2  = list_to_atom(atom_to_list('ra2@') ++ FQDN),
+   
+   % create new  metadata
+   sbcli:create_cluster_metadata(),
+
+   % start
+   sbcli:start(),
+   
+   timer:sleep(2000),
+
+   sbcli:new(sb_cluster_test),
+
+   sbcli:addNode(sb_cluster_test, Node1),
+
+   sbcli:out(sb_cluster_test, {aaaa}),
+
+   % cut off node1 
+   sbcli:stop_node(Node1),
+   
+   %sbcli:addNode(sb_cluster_test, Node2),
+   
+   timer:sleep(500),
+   
+   ?assertMatch(pang, net_adm:ping(Node1)),
+   
+   sbcli:out(sb_cluster_test, {bbbb}),
+
+   timer:sleep(500),
+
+   sbcli:out(sb_cluster_test, {cccc}),
+
+   % rejoin node
+   net_kernel:start([Node1]),
+   
+   timer:sleep(1000),
+   
+   ?assertMatch(pong, net_adm:ping(Node1)),
+
+   erpc:call(Node1, sb, restart, []),
+   
+   timer:sleep(1000),
+
+   %%% Now check: all nodes' metadata must be equal
+
+   % get cluster nodes from env 
+   %{ok,L} = application:get_env(system_metadata, cluster),
+   %[{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, L),
+   
+   % get a list of each node metadata
+   %NList = [erpc:call(N, sbcli, metadata, []) || N <- Nodes],
+
+   % a node's metadata must be equal to each other node's metadata
+   %?assert(lists:all(fun(X) -> X =:= lists:nth(1, NList) end, NList), "Metadata must be equal to each other's node"),
+   
+   erpc:call(Node1, sbcli, rd, [sb_cluster_test, {aaaa}, 200]),
+
+   ?assertMatch([{aaaa}], erpc:call(Node1, sbcli, rd, [sb_cluster_test, {aaaa}, 200])),
+   ?assertMatch([{bbbb}], erpc:call(Node1, sbcli, rd, [sb_cluster_test, {bbbb}, 200])),
+   ?assertMatch([{cccc}], erpc:call(Node1, sbcli, rd, [sb_cluster_test, {cccc}, 200])),
+
+   % stop
+   sbcli:stop(),
+   ok.
+
+
+
 
 datafile_exists(TSName, Node) ->
    {ok, CDHomeDir} = sbenv:get_cluster_env(cluster_datafiles_home_dir),                                                                     

@@ -5,6 +5,7 @@
 	 connect/0,
 	 start/0,
 	 stop/0,
+	 stop_node/1,
 	 metadata/0,
 	 create_cluster_metadata/0,
 	 set_leader/1,
@@ -36,6 +37,9 @@ start() ->
 
 stop() ->
    sb:stop_cluster().	
+
+stop_node(Node) ->
+   erpc:call(Node, sb, stop_node, [], 5000).
 
 metadata() ->
    sb:get_cluster_metadata(ram).

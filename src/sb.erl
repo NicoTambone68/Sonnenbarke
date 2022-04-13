@@ -28,7 +28,8 @@
 	 update_cluster_metadata/1,
 	 update_all_metadata/0,
          start_cluster/0,
-	 stop_cluster/0
+	 stop_cluster/0,
+	 stop_node/0
         ]).
 
 % ra data files directory
@@ -52,6 +53,14 @@ init() ->
    application:ensure_all_started(ra),
    init(init).
 
+% TO DO
+% net_kernel:stop().
+% net_kernel:start([ra1@localhost]).
+stop_node() -> 
+    io:format("Stopping node ~p~n", [node()]),
+    net_kernel:stop(),
+    timer:sleep(500),
+    io:format("Node ~p stopped~n", [node()]).
 
 
 apply(_Meta, Param, State) ->

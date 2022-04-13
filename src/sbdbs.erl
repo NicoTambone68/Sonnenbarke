@@ -46,9 +46,15 @@ open_tables() ->
 
 % TO DO: Scan Metadata.TS and close all the TS
 close_tables() ->
-   ets:delete(sysRam),
-   ets:delete(sysIndex),
-   dets:close(sysDisk).
+   try
+      dets:close(sysDisk),
+      ets:delete(sysRam),
+      ets:delete(sysIndex),
+      ok
+   catch
+      error:Reason -> {error, Reason}
+   end.
+%   dets:close(sysDisk).
 
 
 % Create Tuple Space TSName
