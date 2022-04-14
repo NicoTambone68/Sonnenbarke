@@ -33,7 +33,7 @@
         ]).
 
 % ra data files directory
--define(RA_HOME_DIR, './.ra').
+%-define(RA_HOME_DIR, './.ra').
 % minimum required nodes to form a cluster
 -define(MIN_NODES, 3).
 % System Metadata Table Name
@@ -295,21 +295,22 @@ broadcast_command(Module, Function, Args, Timeout, Nodes) ->
   end.
 
 
-% TO DO: add parameter Metadata and implement the function
-%        use erpc:multicall instead of erpc:call
 update_followers_metadata(ClusterMetaData) -> 
    % Update metadata on every node of the cluster but the leader node which is already updated 
    % This function must be called solely by the leader through one of the Effects method
    Nodes = ClusterMetaData?SYSTEM.nodes,
-   [io:format("Updating Metadata on node ~p, Result: ~p~n",  
-   	      [N, 
-	        try erpc:call(N, ?MODULE, update_cluster_metadata, [ClusterMetaData]) of
-		   _ -> ok
-	        catch
-		   error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
-		end
-	      ]) || N <- Nodes, N /= node()],
+   erpc:multicall(Nodes, ?MODULE, update_cluster_metadata, [ClusterMetaData]),
    ok.
+
+%   [io:format("Updating Metadata on node ~p, Result: ~p~n",  
+%   	      [N, 
+%	        try erpc:call(N, ?MODULE, update_cluster_metadata, [ClusterMetaData]) of
+%		   _ -> ok
+%	        catch
+%		   error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
+%		end
+%	      ]) || N <- Nodes, N /= node()],
+%   ok.
 
 
 state_enter(leader, _) ->
@@ -341,8 +342,9 @@ restart() ->
     % TO DO: create a function on the sbsystem module
     sbdbs:open_tables(),
     sbdbs:close_tables(),
+    {ok, RaHomeDir} = sbenv:get_cluster_env(ra_home_dir), 
     {_, CMeta} = ?MODULE:get_cluster_metadata(disk),
-    ra:start_in(?RA_HOME_DIR),
+    ra:start_in(RaHomeDir),
     ra:restart_server({CMeta?SYSTEM.name, node()}),
     ?MODULE:init().
 
@@ -361,70 +363,82 @@ update_cluster_metadata(ClusterMetaData) ->
    sbdbs:update_cluster_metadata(ClusterMetaData, both).
 
 
-% you need at least three nodes to form a cluster 
+% we need a minimum number of working nodes to form a cluster
+%  
 check_nodes_list(Nodes) when length(Nodes) >= ?MIN_NODES -> ok;
 check_nodes_list(Nodes) when length(Nodes) <  ?MIN_NODES -> not_enough_nodes.
 
-check_active_nodes(Responses) ->
+check_active_nodes(Responses) -> 
    Count = lists:foldl(fun(R, X) -> if R == pong -> X+1; R == pang -> X end end, 0, Responses),
    if Count >= ?MIN_NODES -> ok;
       Count  < ?MIN_NODES -> not_enough_active_nodes
    end.		   
 
 
-% TO DO: no! prendere i metadati dallo storage locale.
-% fare controllo integrita', partire solo se ok
-% e start di sbsystem solo al termine
 start_cluster() ->
-%   {ok, Pid} = sbsystem:start(),
-%   case is_process_alive(Pid) of
+   io:format("Sonnenbarke. A tuple space management system with Ra~n", []),
+   io:format("Nicolò Tambone - UniUrb ADCC~n", []),
+   {ok, RaHomeDir} = sbenv:get_cluster_env(ra_home_dir), 
    sbdbs:open_tables(),
    {Response, Cluster} = sbdbs:get_cluster_metadata(disk),
    sbdbs:close_tables(),
+   TimeOut = 200,
    case Response of
       ok ->
          Nodes = Cluster?SYSTEM.nodes,	
-         % Nodes = ['ra1@localhost', 'ra2@localhost', 'ra3@localhost', 'ra4@localhost'],
          case check_nodes_list(Nodes) of
             ok ->
-               [io:format("Attempting to communicate with node ~s, response: ~s~n", [N, net_adm:ping(N)]) || N <- Nodes],
+               [io:format("Connecting to node ~s: ~s~n", [N, ping_node(N)]) || N <- Nodes],
                Ping=[net_adm:ping(N) || N <- Nodes],
                case check_active_nodes(Ping) of
                   not_enough_active_nodes -> 
 	             handle_starting_failure("You need at least three active nodes to form a cluster");     
                   ok ->
-                     % see erpc:call for possible improvement
-                     [io:format("Initializing node ~s, response: ~p~n",
-		        [N, 
-		           try erpc:call(N, ?MODULE, init, []) of
-		              _ -> ok
-			   catch
-		              _ -> io:format("Initialization of node ~s has failed~n", [N])
-			   end
-		        ]) || N <- Nodes],
-                     [io:format("Starting Ra on node ~s, response: ~p~n", 
-                        [N,
-			   try erpc:call(N, ra, start_in, [?RA_HOME_DIR]) of
-		              _ -> ok
-		           catch
-		              _ -> io:format("Starting Ra on node ~s has failed~n", [N])
-			   end
-                        ]) || N <- Nodes],
+                     io:format("Initializing nodes ~n",[]),
+		     erpc:multicall(Nodes, ?MODULE, init, [], TimeOut),
+
+                     timer:sleep(2000),
+                     
+                     io:format("Starting Ra ~n", []),
+		     erpc:multicall(Nodes, ra, start_in, [RaHomeDir], TimeOut), 
+
+                     timer:sleep(2000),
+				
+		     % see erpc:call for possible improvement
+                     %[io:format("Initializing node ~s, response: ~p~n",
+		     %   [N, 
+		     %      try erpc:call(N, ?MODULE, init, []) of
+		     %         _ -> ok
+		     %	   catch
+		     %         _ -> io:format("Initialization of node ~s has failed~n", [N])
+		     %	   end
+		     %   ]) || N <- Nodes],
+		     %
+                     %[io:format("Starting Ra on node ~s, response: ~p~n", 
+                     %   [N,
+		     %	   try erpc:call(N, ra, start_in, [?RA_HOME_DIR]) of
+		     %         _ -> ok
+		     %      catch
+		     %         _ -> io:format("Starting Ra on node ~s has failed~n", [N])
+		     %	   end
+                     %   ]) || N <- Nodes],
+		     
                      Name = Cluster?SYSTEM.name,  %ra_cluster,
                      ServerIds = [{Name, N} || N <- Nodes],
                      MachineConf = {module, ?MODULE, #{}},
-		     {Result, Started, NotStarted} = ra:start_cluster(default, Name, MachineConf, ServerIds),
+		     Result = ra:start_cluster(default, Name, MachineConf, ServerIds),
 		     case Result of 
-		        ok -> 
-                           io:format("Cluster started successfully~n"),
-			   io:format("Nodes started ~p~n", [Started]),
-			   io:format("Nodes not started ~p~n", [NotStarted]),
-			   % TO DO: debug sb:start_cluster() => 
-			   %              sb:stop_cluster() => sb:start_cluster()
-			   %              CRASH (RAM dets not there)
+		        {ok, Started, NotStarted} -> 
+			   case NotStarted of
+				   [] -> io:format("All nodes have been started correctly~n", []);
+				   _  -> io:format("  The following nodes have been started correctly: ~p~n", [Started]),
+				         io:format("WARNING: the following nodes have failed to start: ~p~n", [NotStarted])
+			   end,
+                           io:format("Cluster started~n~n"),
+			   %io:format("Nodes not started ~p~n", [NotStarted]),
                            ?MODULE:system_command({set_cluster_state, open});
-			error ->
-                           handle_starting_failure("Cluster failed to start on Ra")
+                        {error, Reason} ->
+                           handle_starting_failure(Reason)
 		     end
                end;
             _ -> 
@@ -433,6 +447,13 @@ start_cluster() ->
       error -> handle_starting_failure("A problem occurred: sys_meta.dets not found. Error creating default")
    end.		   
 
+
+ping_node(Node) ->
+   Resp = net_adm:ping(Node),
+   case Resp of
+      pong -> ok;
+	_  -> ko
+   end.
 
 handle_starting_failure(Reason) ->
     io:format("Cluster not started. Reason: ~s~n", [Reason]),

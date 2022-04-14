@@ -27,12 +27,12 @@ all() -> [{group, public}].
 
 groups() -> [
 	     {public, [shuffle], [
-%				  sb_basic_test,
-%				  sb_metadata_test,
-%				  sb_interface_1_test,
-%				  sb_interface_2_test,
-%				  sb_interface_3_test,
-				  sb_cluster_test
+				  sb_basic_test,
+				  sb_metadata_test,
+				  sb_interface_1_test,
+				  sb_interface_2_test,
+				  sb_interface_3_test
+%				  sb_cluster_test
 				 ]}
 	    ].
 
@@ -180,14 +180,20 @@ sb_interface_3_test(_Config) ->
 
 
 sb_cluster_test(_Config) ->
+   
+   % get cluster nodes from env 
+   {ok,L} = application:get_env(system_metadata, cluster),
+   [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, L),
 
    % get the Fully Qualified Domain Name
-   {ok, FQDN} = net_adm:dns_hostname(net_adm:localhost()),
+   %{ok, FQDN} = net_adm:dns_hostname(net_adm:localhost()),
 
    % Node names
-    Node1  = list_to_atom(atom_to_list('ra1@') ++ FQDN),
-    %Node2  = list_to_atom(atom_to_list('ra2@') ++ FQDN),
-   
+   % Node1  = list_to_atom(atom_to_list('ra1@') ++ FQDN),
+   %Node2  = list_to_atom(atom_to_list('ra2@') ++ FQDN),
+  
+   Node1 = lists:nth(1, Nodes), 
+
    % create new  metadata
    sbcli:create_cluster_metadata(),
 
@@ -203,13 +209,19 @@ sb_cluster_test(_Config) ->
    sbcli:out(sb_cluster_test, {aaaa}),
 
    % cut off node1 
-   sbcli:stop_node(Node1),
+   %sbcli:stop_node(Node1),
+
+   % set an invalid cookie to avoid reconnection
+%   erlang:set_cookie(Node1, invalid_cookie),
+   
+   % disconnect Node1 and check disconnection
+   ?assertMatch(true, erlang:disconnect_node(Node1)),
    
    %sbcli:addNode(sb_cluster_test, Node2),
    
    timer:sleep(500),
    
-   ?assertMatch(pang, net_adm:ping(Node1)),
+   %?assertMatch(pang, net_adm:ping(Node1)),
    
    sbcli:out(sb_cluster_test, {bbbb}),
 
@@ -218,10 +230,12 @@ sb_cluster_test(_Config) ->
    sbcli:out(sb_cluster_test, {cccc}),
 
    % rejoin node
-   net_kernel:start([Node1]),
+   %net_kernel:start([Node1]),
    
-   timer:sleep(1000),
-   
+   %timer:sleep(1000),
+
+   % reconnect   
+%   erlang:set_cookie(Node1, erlang:get_cookie()),
    ?assertMatch(pong, net_adm:ping(Node1)),
 
    erpc:call(Node1, sb, restart, []),
