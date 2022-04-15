@@ -2,16 +2,6 @@
 %%% Description : Include file for system db
 %%% system stores metadata of the cluster
 
-% -record(usr, 
-% {msisdn, 		%int()
-% id, 			%term()
-% status = enabled, 	%atom(), enabled | disabled
-% plan, 			%atom(), prepay | postpay
-% services = []}). 	%[atom()], service flag list
-
-%TO DO: 
-%   rename name to cluster_name
-%   add node_name
 
 -record(sys_meta,
 	{id       = 1,			%int()

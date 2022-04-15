@@ -1,3 +1,8 @@
+%%
+%%
+%%
+%% @doc This module is for handling all of the tuple space methods
+
 -module(sbts).
 -behaviour(gen_server).
 -include("sys_meta.hrl").
@@ -43,20 +48,21 @@
 
 -define(SYSTEM, #sys_meta).
 
-
+%% @doc Registers the new TS Name on node Node
+%%
+%% @param Name = string(), Node = atom()
+%%
+%% @returns term()
+%%
+%% @end
+-spec new_(string(), atom()) -> term().
 new_(Name, Node) -> 
-   % register the new TS in the system's metadata table
    % get current metadata
    {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
-   % get current leader node
-   % This was originally intended to be Leader, for simplicity we actually just use node() 
-   % Leader = node(),
 
    % Chek if Name Node already exist
-   %
    TSList = ClusterMetadata?SYSTEM.ts,
    % Get all TSNames from TSList
-   % [N || {N,_} <- TSList]
    case lists:member(Name, [N || {N,_} <- TSList]) of
 	   % Name is already there. Check the associated nodes
 	   true -> [{Name, AN}] = [{N,L} || {N,L} <- TSList, N == Name],
@@ -98,34 +104,67 @@ new_(Name, Node) ->
    Return.
 
 
+%% @doc Implements the in method 
+%%
+%% @param TS = string(), Pattern = tuple()
+%%
+%% @returns term()
+%%
+%% @end
+-spec in_(string(), tuple()) -> term().
 in_(TS, Pattern) -> 
    %MatchPattern = ?MODULE:match(Pattern), 
    sbdbs:match_delete_ts(TS, ?MODULE:match(Pattern)).
 
+%% @doc Implements the rd method
+%%
+%% @param TS = string(), Pattern = tuple()
+%%
+%% @returns term()
+%%
+%% @end
+-spec rd_(string(), tuple()) -> term().
 rd_(TS, Pattern) -> 
    % MatchPattern = ?MODULE:match(Pattern), 
    sbdbs:match_ts(TS, ?MODULE:match(Pattern)).
 
-% Translate the InputPattern with wildcards (any) to a pattern which
-% effectively performs dets:match_object 
+%% @doc Translates the InputPattern with wildcards (any) to a pattern which 
+%% actually performs dets:match_object
+%%
+%% @param InputPattern = tuple() 
+%%
+%% @returns term()
+%%
+%% @end
+-spec match(tuple()) -> term().
 match(InputPattern) ->
    List = tuple_to_list(InputPattern),
    list_to_tuple(lists:map(fun(X) -> case X of any -> '_'; _ -> X end end, List)).
 
+%% @doc Implements the out method 
+%%
+%% @param TS = string(), Tuple = tuple() 
+%%
+%% @returns term()
+%%
+%% @end
+-spec out_(string(), tuple()) -> term().
 out_(TS, Tuple) ->
       sbdbs:insert_ts(TS, Tuple).
-%   try       	
-%      sbdbs:insert_ts(TS, Tuple)
-%   catch
-%      error:Error -> {error, Error}
-%   end.
-
-%   {ok, [Tuple]}.
 
 % Interface 2/3
-% Tima out in API Call (see below)
+% Time out in API Call (see below)
 
 % Interface 3/3
+%
+%% @doc Implements addNode
+%%
+%% @param TS = string(), Node = atom()
+%%
+%% @returns term()
+%%
+%% @end
+-spec addNode_(string(), atom()) -> term().
 addNode_(TS, Node) -> 
  try
    % get current metadata
@@ -163,7 +202,14 @@ addNode_(TS, Node) ->
     error:Error -> {error, Error}
  end.	 
 
-
+%% @doc Implements removeNode
+%%
+%% @param TS = string(), Node = atom()
+%%
+%% @returns term()
+%%
+%% @end
+-spec removeNode_(string(), atom()) -> term().
 removeNode_(TS, Node) -> 
  try
    % get current metadata
@@ -201,8 +247,14 @@ removeNode_(TS, Node) ->
     error:Error -> {error, [Error]}
  end.	 
 
-
-% Remove TS from metadata
+%% @doc Remove TS from metadata 
+%%
+%% @param TS = string()
+%%
+%% @returns term()
+%%
+%% @end
+-spec removeTS_(string()) -> term().
 removeTS_(TS) -> 
  try
    % get current metadata
@@ -237,7 +289,14 @@ removeTS_(TS) ->
     error:Error -> {error, [Error]}
  end.	 
 
-
+%% @doc Implements nodes(TS)
+%%
+%% @param TS = string()
+%%
+%% @returns term()
+%%
+%% @end
+-spec nodes_(string()) -> term().
 nodes_(TS) -> 
  try
    % get current metadata
@@ -263,27 +322,56 @@ nodes_(TS) ->
 
 
 
-
-%gen_server's callbacks
+%% @doc Starts the gen_server's process
+%%
+%% @param none
+%%
+%%
+%% @returns term()
+%%
+%% @end
+-spec start() -> term().
 start() ->
-  % system_flag(trap_exit, true),
   % Note: the process is registered as global in order for every node to receive
   % the wake up message
   % Sending wake up message: {sbts, 'ra4@localhost'}!wake_up.
     process_flag(trap_exit, true),
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-%  gen_server:start({local, ?MODULE}, ?MODULE, [], []).
 
+%% @doc Initializes the gen_server
+%%
+%% @param 
+%%
+%% @returns
+%%
+%% @end
+-spec init(term()) -> term().
 init(_Args) -> {ok, ready}.
 
+-spec init() -> term().
 init() -> init(init).
 
+%% @doc Stops the gen_server
+%%
+%% @param 
+%%
+%% @returns
+%%
+%% @end
+-spec stop() -> term().
 stop() ->
    gen_server:cast(?MODULE, stop).	
 
-% handle_call callback function
-% NOTE: State is used to pass From to the outside
-% thus State must not be changed otherwise
+%% @doc HandleCall callback function
+%% NOTE: State is used to pass From to the outside
+%% thus State must not be changed otherwise
+%%
+%% @param Call = term(), From = term(), State = term()
+%%
+%% @returns term()
+%%
+%% @end
+-spec handle_call(term(), term(), term()) -> term().
 handle_call(Call, From, State) -> 
    case Call of
 % Interface 1-2	   
@@ -307,12 +395,29 @@ handle_call(Call, From, State) ->
    end.
 
 
+%% @doc Handles the wake-up call after blocking, replying to 
+%% the caller of a gen_server method 
+%%
+%% @param From = term()
+%%
+%% @returns term()
+%%
+%% @end
+-spec wake_up(term()) -> term().
 wake_up(From) ->
    io:format("Waking up after block. Ciao~n"),
    {no_match, F} = From,
    gen_server:reply(F, ok).
 
-
+%% @doc Manages the incoming messages and takes action accordingly.
+%% We will catch new_tuple_in message to trigger the wake_up function
+%%
+%% @param Info = term(), State = term()
+%%
+%% @returns term()
+%%
+%% @end
+-spec handle_info(term(), term()) -> term().
 handle_info(Info, State) ->
    io:format("Got message ~p~n", [Info]),
    case Info of
@@ -325,29 +430,90 @@ handle_info(Info, State) ->
    end,
    {noreply, State}. 
 
-
+%% @doc Callback for the stop call
+%%
+%% @param stop = atom(), State = term()
+%%
+%% @returns term()
+%%
+%% @end
+-spec handle_cast(atom(), term()) -> term().
 handle_cast(stop, State) -> {stop, normal, State}.
 
 % Suspend execution with explicit call to methods
 
+%% @doc Implements the reqired block when there's no matching with methods in and rd.
+%% This is done by calling the method halt with a time out of infinity. 
+%% Inside the handle_call the function halt is not going to reply, thus causing 
+%% the required block. Whenever a new_tuple_in message is received, a reply is 
+%% given to the caller, thus removing the block. For further details, see
+%% the above function wake_up
+%%
+%% @param none
+%%
+%% @returns term().
+%%
+%% @end
+-spec halt() -> term().
 halt() ->
    gen_server:call(?MODULE, halt, infinity).
 
+%% @doc Implements halt with a timeout
+%%
+%% @param none
+%%
+%% @returns term()
+%%
+%% @end
+-spec halt(integer()) -> term().
 halt(Timeout) ->
    gen_server:call(?MODULE, halt, Timeout).
 
 
 % Interface 1
+
+
+%% @doc new
+%%
+%% @param Name = string(), Node = atom()
+%%
+%% @returns term()
+%%
+%% @end
+-spec new(string(), atom()) -> term().
 new(Name, Node) ->
    gen_server:call(?MODULE, {new, Name, Node}).
 
+%% @doc in
+%%
+%% @param TS = string, Pattern = tuple()
+%%
+%% @returns
+%%
+%% @end
+-spec in(string(), tuple()) -> term().
 in(TS, Pattern) ->
    gen_server:call(?MODULE, {in, TS, Pattern}, infinity).
 
+%% @doc rd
+%%
+%% @param TS = string, Pattern = tuple()
+%%
+%% @returns term()
+%%
+%% @end
+-spec rd(string(), tuple()) -> term().
 rd(TS, Pattern) ->
    gen_server:call(?MODULE, {rd, TS, Pattern}, infinity).
 
-
+%% @doc in with Timeout 
+%%
+%% @param TS = string, Pattern = tuple()
+%%
+%% @returns term()
+%%
+%% @end
+-spec in(string(), tuple(), integer()) -> term().
 in(TS, Pattern, Timeout) ->
    %gen_server:call(?MODULE, {in, TS, Pattern}, Timeout).
    try 
@@ -360,7 +526,14 @@ in(TS, Pattern, Timeout) ->
       end
    end.      
 
-
+%% @doc rd with Timeout 
+%%
+%% @param TS = string, Pattern = tuple()
+%%
+%% @returns
+%%
+%% @end
+-spec rd(string(), tuple(), integer()) -> term().
 rd(TS, Pattern, Timeout) ->
    try 
       Result = gen_server:call(?MODULE, {rd, TS, Pattern}, Timeout),
@@ -372,18 +545,57 @@ rd(TS, Pattern, Timeout) ->
       end
    end.      
 
-
+%% @doc out
+%%
+%% @param TS = string, Tuple = tuple()
+%%
+%% @returns term()
+%%
+%% @end
+-spec out(string(), tuple()) -> term().
 out(TS, Tuple) ->
    gen_server:call(?MODULE, {out, TS, Tuple}).
 
+%% @doc addNode
+%%
+%% @param TS = string, Tuple = tuple()
+%%
+%% @returns term()
+%%
+%% @end
+-spec addNode(string(), atom()) -> term().
 addNode(TS, Node) ->
    gen_server:call(?MODULE, {addNode, TS, Node}).
 
+%% @doc removeNode
+%%
+%% @param TS = string(), Tuple = tuple()
+%%
+%% @returns term().
+%%
+%% @end
+-spec removeNode(string(), atom()) -> term().
 removeNode(TS, Node) ->
    gen_server:call(?MODULE, {removeNode, TS, Node}).
 
+%% @doc nodes
+%%
+%% @param TS = string()
+%%
+%% @returns term()
+%%
+%% @end
+-spec nodes(string()) -> term().
 nodes(TS) ->
    gen_server:call(?MODULE, {nodes, TS}).
 
+%% @doc removeTS 
+%%
+%% @param TS = string()
+%%
+%% @returns term()
+%%
+%% @end
+-spec removeTS(string()) -> term().
 removeTS(TS) ->
    gen_server:call(?MODULE, {removeTS, TS}).

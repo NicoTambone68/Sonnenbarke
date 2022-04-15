@@ -1,10 +1,22 @@
+%%
+%%
+%%
+%% @doc This module is for reading environment variable from config/sys.config
+
 -module(sbenv).
 
 -export([
 	 get_cluster_env/1
 	]).
 
-% return value of corresponding Param read from sys.config
+%% @doc Returns the value of corresponding Param read from sys.config   
+%%
+%% @param Param = atom()
+%%
+%% @returns term()
+%%
+%% @end
+-spec get_cluster_env(term()) -> term().
 get_cluster_env(Param) ->
    % Read initial values from config/sys.config
    {ok,L} = application:get_env(system_metadata, cluster),

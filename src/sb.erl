@@ -1,5 +1,7 @@
-%% See also:
-%%% https://github.com/rabbitmq/ra-examples/blob/master/refcell/src/refcell.erl
+%%
+%%
+%%
+%% @doc The main module for starting, stopping and interacting with the Ra cluster
 
 -module(sb).
 -behaviour(ra_machine).
@@ -13,13 +15,13 @@
 	 system_effects/1,
 	 command_effects/1,
 	 %
-	 halt/0,
-	 halt/1,
+	 %halt/0,
+	 %halt/1,
 
          %% Client api
 	 system_command/1,
 	 command/1,
-	 broadcast_command/5,
+%	 broadcast_command/5,
 	 restart/0,
 
          %% Cluster management API
@@ -28,19 +30,19 @@
 	 update_cluster_metadata/1,
 	 update_all_metadata/0,
          start_cluster/0,
-	 stop_cluster/0,
-	 stop_node/0
+	 stop_cluster/0
+%	 stop_node/0
         ]).
 
-% ra data files directory
-%-define(RA_HOME_DIR, './.ra').
 % minimum required nodes to form a cluster
 -define(MIN_NODES, 3).
+
 % System Metadata Table Name
 -define(SYSTEM, #sys_meta).
 
 %% ra_machine implementation
 
+-spec init(term()) -> [ok].
 init(_Config) -> 
    % sbsystem is a gen_server which handles system's metadata
    sbsystem:start(),
@@ -48,21 +50,34 @@ init(_Config) ->
    sbts:start(),
    [ok]. %#{}.
 
-
+-spec init() -> term().
 init() ->
    application:ensure_all_started(ra),
    init(init).
 
-% TO DO
-% net_kernel:stop().
-% net_kernel:start([ra1@localhost]).
-stop_node() -> 
-    io:format("Stopping node ~p~n", [node()]),
-    net_kernel:stop(),
-    timer:sleep(500),
-    io:format("Node ~p stopped~n", [node()]).
+% TO DO: remove this
+%stop_node() -> 
+%    io:format("Stopping node ~p~n", [node()]),
+%    net_kernel:stop(),
+%    timer:sleep(500),
+%    io:format("Node ~p stopped~n", [node()]).
 
-
+%% @doc ra_machine callback function
+%% This function allows to process messages sent to the cluster.
+%% This is done by means of the Reply fucntion which is executed by each node
+%% The optional Effects function is executed only by the Leader
+%%
+%% @param 
+%% _Meta: ra_machine metadata
+%% Param: message sent by the caller
+%%        {system, Value} | {command, Value}
+%% State: ra_machine state
+%%
+%% @returns
+%% {State, Reply} | {State, Reply, Effects}
+%%
+%% @end
+-spec apply(term(), term(), term()) -> term().
 apply(_Meta, Param, State) ->
 	case Param of
 	   %% System messages 
@@ -81,17 +96,8 @@ apply(_Meta, Param, State) ->
 	     {NewState, Reply, Effects};
 	   {command, Value} ->
               io:format("Received command ~p~n", [Value]),
-	      % io:format("Meta ~p~n", [_Meta]),
-	      %Effects = [{mod_call, ?MODULE, command_effects, [Value]}],
               % command_effects should be called through mod_call through Effects
 	      % but we need to send back Reply, so non blocking effects are called here
-	      %{Response, Result} = ?MODULE:command_effects(Value),
-	      %case Response of
-              %   no_match -> Reply = no_match,
-	      %		      {State, Reply};
-              %         _  -> Reply = Result,
-              %               {State, Reply}
-              %end
 	      Reply = ?MODULE:command_effects(Value),
 	      % Any command wich modifies data must update metadata
 	      % This is done by the Leader through Effects
@@ -104,6 +110,19 @@ apply(_Meta, Param, State) ->
 	      end
 	end.
 
+%% @doc Reply function for internal System's messages
+%% Sset the cluster state to the new state (open | close).
+%% Update Leader metadata, then update all the followers metadata.
+%%
+%% @param 
+%% Value: {system, {set_cluster_state, ClusterState}}
+%%
+%% @returns
+%% when a wrong parameter was passed: {error, invalid_system_effect_parameter}
+%%
+%% @end
+%%
+-spec system_effects(term()) -> term().
 system_effects(Value) ->
    case Value of
       {set_cluster_state, ClusterState} 
@@ -116,13 +135,35 @@ system_effects(Value) ->
       _ -> {error, invalid_system_effect_parameter}
    end.	   
 
+%% @doc Updates Leader and followers metadata after a transaction 
+%% Every transaction il labeled with a unique Scn (System Change Number)
+%% The currenta value of Scn is recorded into the cluster's metadata
+%%
+%% @param 
+%% none
+%%
+%% @returns
+%% none
+%%
+%% @end
 % system utility: updates Leader and followers metadata after a transaction
+-spec update_all_metadata() -> term(). 
 update_all_metadata() ->
    Scn = sbsystem:get_scn(),
    {_, ClusterMetaData} = sbsystem:update_cluster_metadata(Scn),
    update_followers_metadata(ClusterMetaData).
 
-% TO DO: get_scn() only for transactions since it's useless for read-only operations
+%% @doc Command interpreter 
+%%
+%% @param Value =  {new, Name, Node} | {out, TS, Tuple} | {rd, TS, Pattern} 
+%% | {in, TS, Pattern} | {addNode, TS, Node} | {removeNode, TS, node} | {nodes, TS}
+%%
+%% @returns
+%% Result of the operation | {invalid_command}
+%%
+%% @end
+%%
+-spec command_effects(term()) -> term().
 command_effects(Value) ->
    io:format("Received command: ~p~n", [Value]),
    case Value of
@@ -181,20 +222,7 @@ command_effects(Value) ->
                                          Return = {{addNode, TS, Node}, ok}
 			      end 
 		     end;
-		     % What if the current Leader doesn't own the TS?
-		     % Take the first node associated with the TS
-		     % to be sure to have a correct reference
-		     % TO DO: round robin to take another node
-		     % if the first associated is down
-		     % ////////////////
-                     % copy_ts replicates TS data of NodeFrom to Node
-		     % by copying record by record through an erpc:call 
-		     % TO DO: move to sbts
-		     %////////////////////
 
-		     % delete: replicate TS datafile to the new node
-		     %         thus copy dets file or recreate the table?
-		     % TO DO: put the following code in update_all_metadata/0
 
       {removeNode, TS, Node} ->
 		     {Result, Nodes} = sbts:nodes(TS),
@@ -217,50 +245,65 @@ command_effects(Value) ->
 		     end,
 		     Return = {{removeNode, TS, Node}, ok};
 
+
 	   {nodes, TS} ->
 		   Return = sbts:nodes(TS);
 
       % /////////////////////////////////////////////////////
       % 
       % This is an extra utility out of system specifications
-      %
+      % TO DO: remove
       % /////////////////////////////////////////////////////
-      {removeTS, TS} ->
-		     {Result, Nodes} = sbts:nodes(TS),
-		     case Result of
-		        ok ->% Remove all the associated Nodes
-			     [erpc:call(Node, sbts, removeNode, [TS, Node]) || Node <- Nodes],
-			      % remove physical datafile in the given node
-                             [erpc:call(Node, sbdbs, delete_table, [TS]) || Node <- Nodes];
-
-			 _ -> no_associated_nodes
-		     end,
-		     % Remove TS from the System Metadata
-                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-                     ClusterNodes = ClusterMetaData?SYSTEM.nodes,
-                     ?MODULE:broadcast_command(sbts, removeTS, [TS], 5000, ClusterNodes),
-                     % Update system Metadata
-                     Scn = sbsystem:get_scn(),
-		     % TO DO: write_redo_log(scn, command)
-		     % TO DO: put the following code in update_all_metadata/1
-		     sbsystem:update_cluster_metadata(Scn),
-                     {_, ClusterMetaDataUpdated} = sbsystem:get_cluster_metadata(),
-                     update_followers_metadata(ClusterMetaDataUpdated),
-		     Return = {{removeTS, TS}, ok};
+%      {removeTS, TS} ->
+%		     {Result, Nodes} = sbts:nodes(TS),
+%		     case Result of
+%		        ok ->% Remove all the associated Nodes
+%			     [erpc:call(Node, sbts, removeNode, [TS, Node]) || Node <- Nodes],
+%			      % remove physical datafile in the given node
+%                             [erpc:call(Node, sbdbs, delete_table, [TS]) || Node <- Nodes];
+%
+%			 _ -> no_associated_nodes
+%		     end,
+%		     % Remove TS from the System Metadata
+%                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
+%                     ClusterNodes = ClusterMetaData?SYSTEM.nodes,
+%                     ?MODULE:broadcast_command(sbts, removeTS, [TS], 5000, ClusterNodes),
+%                     % Update system Metadata
+%                     Scn = sbsystem:get_scn(),
+%		     % TO DO: write_redo_log(scn, command)
+%		     % TO DO: put the following code in update_all_metadata/1
+%		     sbsystem:update_cluster_metadata(Scn),
+%                     {_, ClusterMetaDataUpdated} = sbsystem:get_cluster_metadata(),
+%                     update_followers_metadata(ClusterMetaDataUpdated),
+%		     Return = {{removeTS, TS}, ok};
 
 		     _ -> Return = {invalid_command}
      end,
      Return.
-     %io:format("~p~n", [Return]).
 
+%% TO DO: Remove
+%halt() ->
+%   sbdbs:halt().
 
-halt() ->
-   sbdbs:halt().
+%halt(Timeout) ->
+%   sbdbs:halt(Timeout).
 
-halt(Timeout) ->
-   sbdbs:halt(Timeout).
-
-
+%% @doc Abstract implementation of all the functions described as the "Interface 1/3"
+%% of the specifications. 
+%%
+%% @param Function: new | in | rd | out; TS = Tuple Space name; 
+%% Tuple is whatever tuple to be processed by Function.
+%% When Function = new, also sends the message new_tuple_in
+%% to the module sbts of all of the cluster nodes.
+%% This is the wake-up event for blocking operations in and rd.
+%% (see project specifications for details)
+%%
+%% @returns
+%% An array of tuple [{tuple()}] or other results according to the function
+%% or {err, ts_doesnt_exist} if the tuple space TS doesn't exist
+%% @end
+%%
+-spec interface_1(string(), string(), tuple()) -> term().
 interface_1(Function, TS, Tuple) ->
    % Get the list of nodes associated with TS 
    {Result, Nodes} = sbts:nodes(TS),
@@ -286,60 +329,89 @@ interface_1(Function, TS, Tuple) ->
 
 
 % Execute Module:Function on the given nodes throgh erpc call
-broadcast_command(Module, Function, Args, Timeout, Nodes) ->
- io:format("Broadcasting command: ~p~n", [Function]), 
-  try 
-     erpc:multicall(Nodes, Module, Function, Args, Timeout)
-  catch
-     error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
-  end.
+% TO DO:remove
+%broadcast_command(Module, Function, Args, Timeout, Nodes) ->
+% io:format("Broadcasting command: ~p~n", [Function]), 
+%  try 
+%     erpc:multicall(Nodes, Module, Function, Args, Timeout)
+%  catch
+%     error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
+%  end.
 
-
+%% @doc Updates metadata on every node of the cluster but the leader node which is already updated.
+%% This function must be called solely by the leader through one of the Effects method.
+%%
+%% @param ClusterMetadata: record containing all the cluster's metadata. See sys_meta.hrl
+%%
+%% @returns ok
+%%
+%% @end
+%%
+-spec update_followers_metadata(term()) -> term().
 update_followers_metadata(ClusterMetaData) -> 
-   % Update metadata on every node of the cluster but the leader node which is already updated 
-   % This function must be called solely by the leader through one of the Effects method
    Nodes = ClusterMetaData?SYSTEM.nodes,
    erpc:multicall(Nodes, ?MODULE, update_cluster_metadata, [ClusterMetaData]),
    ok.
 
-%   [io:format("Updating Metadata on node ~p, Result: ~p~n",  
-%   	      [N, 
-%	        try erpc:call(N, ?MODULE, update_cluster_metadata, [ClusterMetaData]) of
-%		   _ -> ok
-%	        catch
-%		   error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
-%		end
-%	      ]) || N <- Nodes, N /= node()],
-%   ok.
-
-
+%% @doc Callback function of the ra_machine. It's triggered whenever the cluster's state changes
+%% Here we implement the callback to signal when a node becomes leader 
+%%
+%% @param leader:atom()
+%%
+%% @returns
+%% none
+%%
+%% @end
+-spec state_enter(term(), term()) -> term().
 state_enter(leader, _) ->
-    ServerId = {ra_cluster, node()},
-    io:format("Current leader node is ~p~n", [ServerId]),
+    io:format("Current leader node is ~p~n", [node()]),
     [];
 state_enter(_, _) ->
     [].
 
 %% Client api
 
-
+%% @doc Sends a system command to the cluster
+%%
+%% @param Value (see system_effects)
+%%
+%% @returns Result
+%%
+%% @end
+%%
+-spec system_command(term()) -> term().
 system_command(Value) ->
     ClusterName = sbsystem:get_cluster_name(),
     {ok, Result, _Leader} = ra:process_command({ClusterName, node()}, {system, Value}),
     Result.
 
-
+%% @doc Sends a TS command to the cluster
+%%
+%% @param Command (see command_effects)
+%%
+%% @returns {Result, Reply}
+%%
+%% @end
+%%
+-spec command(term()) -> term().
 command(Command) ->
     ClusterName = sbsystem:get_cluster_name(),
     {Result, Reply, _Leader} = ra:process_command({ClusterName, node()}, {command, Command}),
     {Result, Reply}.
 
 
-% restart after a crash
+%% @doc Restart a node previously started and then crashed  
+%%
+%% @param none
+%%
+%% @returns none
+%%
+%% @end
+%%
+-spec restart() -> term().
 restart() ->
     % open tables in order to force repair 
     % then close them again
-    % TO DO: create a function on the sbsystem module
     sbdbs:open_tables(),
     sbdbs:close_tables(),
     {ok, RaHomeDir} = sbenv:get_cluster_env(ra_home_dir), 
@@ -349,32 +421,73 @@ restart() ->
     ?MODULE:init().
 
 
-%% Cluster api
+%% @doc Utility function to visualize the current cluster's metadata
+%% (See sys_meta.hrl form metadata's structure)
 %%
+%% @param From: ram|disk
 %%
-%% From == ram | disk
+%% @returns {Response, ClusterMetdata)
+%%
+%% @end
+%%
+-spec get_cluster_metadata(term()) -> term().
 get_cluster_metadata(From) ->
    sbdbs:open_tables(),
    {Response, ClusterMetaData} = sbdbs:get_cluster_metadata(From),
    {Response, ClusterMetaData}.
 
 
+%% @doc Update cluster's metadata with current data on both ram and disk
+%%
+%% @param ClusterMetadata (see sys_meta.hrl)
+%%
+%% @returns {ok, ClusterMetaData}
+%%
+%% @end
+%%
+-spec update_cluster_metadata(term()) -> term().
 update_cluster_metadata(ClusterMetaData) ->
    sbdbs:update_cluster_metadata(ClusterMetaData, both).
 
 
-% we need a minimum number of working nodes to form a cluster
-%  
+%% @doc Checks the list of the cluster nodes to contain at least the minumum number 
+%% of nodes needed to form a cluster (usually 3).
+%%
+%% @param Nodes:List().
+%%
+%% @returns ok | not_enaugh_nodes
+%%
+%% @end
+%%
+-spec check_nodes_list(term()) -> term().
 check_nodes_list(Nodes) when length(Nodes) >= ?MIN_NODES -> ok;
 check_nodes_list(Nodes) when length(Nodes) <  ?MIN_NODES -> not_enough_nodes.
 
-check_active_nodes(Responses) -> 
-   Count = lists:foldl(fun(R, X) -> if R == pong -> X+1; R == pang -> X end end, 0, Responses),
+%% @doc Check every node contained in the given list, by pinging it.
+%% Returns ok if the number of responsive nodes is enaugh to form a cluster
+%% 
+%% @param Nodes:List()
+%%
+%% @returns ok | not_enough_active_nodes
+%%
+%% @end
+%%
+-spec check_active_nodes(term()) -> term().
+check_active_nodes(Nodes) -> 
+   Count = lists:foldl(fun(R, X) -> if R == pong -> X+1; R == pang -> X end end, 0, Nodes),
    if Count >= ?MIN_NODES -> ok;
       Count  < ?MIN_NODES -> not_enough_active_nodes
    end.		   
 
-
+%% @doc Initializes and starts the cluster.
+%%
+%% @param none
+%%
+%% @returns ok | cluster_not_started
+%%
+%% @end
+%%
+-spec start_cluster() -> term().
 start_cluster() ->
    io:format("Sonnenbarke. A tuple space management system with Ra~n", []),
    io:format("Nicolò Tambone - UniUrb ADCC~n", []),
@@ -403,25 +516,6 @@ start_cluster() ->
 		     erpc:multicall(Nodes, ra, start_in, [RaHomeDir], TimeOut), 
 
                      timer:sleep(2000),
-				
-		     % see erpc:call for possible improvement
-                     %[io:format("Initializing node ~s, response: ~p~n",
-		     %   [N, 
-		     %      try erpc:call(N, ?MODULE, init, []) of
-		     %         _ -> ok
-		     %	   catch
-		     %         _ -> io:format("Initialization of node ~s has failed~n", [N])
-		     %	   end
-		     %   ]) || N <- Nodes],
-		     %
-                     %[io:format("Starting Ra on node ~s, response: ~p~n", 
-                     %   [N,
-		     %	   try erpc:call(N, ra, start_in, [?RA_HOME_DIR]) of
-		     %         _ -> ok
-		     %      catch
-		     %         _ -> io:format("Starting Ra on node ~s has failed~n", [N])
-		     %	   end
-                     %   ]) || N <- Nodes],
 		     
                      Name = Cluster?SYSTEM.name,  %ra_cluster,
                      ServerIds = [{Name, N} || N <- Nodes],
@@ -447,7 +541,16 @@ start_cluster() ->
       error -> handle_starting_failure("A problem occurred: sys_meta.dets not found. Error creating default")
    end.		   
 
-
+%% @doc Wrapper of the BIF net_adm:ping(Node) 
+%% just to have the return values of ok and ko instead of pong and pang 
+%%
+%% @param Node
+%%
+%% @returns ok|ko
+%%
+%% @end
+%%
+-spec ping_node(term()) -> term().
 ping_node(Node) ->
    Resp = net_adm:ping(Node),
    case Resp of
@@ -455,36 +558,81 @@ ping_node(Node) ->
 	_  -> ko
    end.
 
+%% @doc Signals the reasons of the cluster's starting failure 
+%%
+%% @param Reasons
+%%
+%% @returns cluster_not_started
+%%
+%% @end
+%%
+-spec handle_starting_failure(string()) -> term().
 handle_starting_failure(Reason) ->
     io:format("Cluster not started. Reason: ~s~n", [Reason]),
     cluster_not_started.
 
-
+%% @doc Stop the cluster previously started
+%%
+%% @param none
+%%
+%% @returns cluster_stopped
+%%
+%% @end
+%%
+-spec stop_cluster() -> term().
 stop_cluster() ->
    ?MODULE:system_command({set_cluster_state, closed}),
    stopping_sequence(),
    cluster_stopped.
 
-
+%% @doc Takes down all of the cluster processes following the correct sequence
+%%
+%% @param none 
+%%
+%% @returns none
+%%
+%% @end
+%%
+-spec stopping_sequence() -> term().
 stopping_sequence() ->
+   TimeOut = 200,
    {_, Cluster} = get_cluster_metadata(ram),
    case Cluster of
       no_data -> 
          {error, error_retrieving_metadata};
       _ ->
          Nodes = Cluster?SYSTEM.nodes,
+         io:format("Stopping Cluster~n", []),
          [io:format("Stopping Ra on node ~s, response: ~p~n", 
                  [N, rpc:call(N, ra, stop_server, [default, {Cluster?SYSTEM.name, N}])]) || N <- Nodes],
-         [rpc:call(N, sbsystem, stop, []) || N <- Nodes],
-         [rpc:call(N, sbts, stop, []) || N <- Nodes]
+         erpc:multicall(Nodes, sbsystem, stop, [], TimeOut),
+         timer:sleep(2000),
+	 erpc:multicall(Nodes, sbts, stop, [], TimeOut),
+         io:format("Cluster is down.~n", [])
    end.
 
-% Create a new metadata storage 
-%  WARNING! Overwrites data
+%% @doc Creates brand new empty metadata on the current node
+%% WARNING: previous metadata will be overwritten 
+%%
+%% @param none
+%%
+%% @returns none
+%%
+%% @end
+%%
+-spec create_cluster_metadata() -> term().
 create_cluster_metadata() ->
    sbsystem:create_cluster_metadata().
    
-% Copy TS data from NodeFrom to NodeTo
+%% @doc Copies TS data from NodeFrom to NodeTo
+%%
+%% @param Tuple Space Name, NodeFrom, NodeTo 
+%%
+%% @returns ok
+%%
+%% @end
+%%
+-spec copy_ts(string(), atom(), atom()) -> term().
 copy_ts(TS, NodeFrom, NodeTo) ->
    erpc:call(NodeFrom, sbdbs, open_table, [TS]),
    erpc:call(NodeTo, sbdbs, open_table, [TS, create_if_not_exists]),
@@ -500,6 +648,7 @@ copy_ts(TS, NodeFrom, NodeTo) ->
 	    copy_ts(TS, NodeFrom, NodeTo, Key)
    end.
 
+-spec copy_ts(string(), atom(), atom(), term()) -> term().
 copy_ts(TS, NodeFrom, NodeTo, Key) ->
    {NextList, NextKey} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS, Key]),
    case NextList of
