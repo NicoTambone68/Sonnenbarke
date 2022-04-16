@@ -1,17 +1,14 @@
 # Sonnenbarke
-=====
 
-### An OTP tuple space management application in Erlang with Ra
+## An OTP tuple space management application in Erlang with Ra
 
-Exam project of the course of Distributed Applications and Cloud Computing 
+#### Exam project of the course of Distributed Applications and Cloud Computing. Academic Year 2021/2022
 
-Masters degree course of Applied Informatics UniUrb 
+#### Masters degree course of Applied Informatics UniUrb 
 
-Nicolò Tambone 309828
+implemented by Nicolò Tambone 309828
 
 ## Introduction
-------------
-
 
 ### Tuple Space
 
@@ -90,9 +87,9 @@ Ra is an open source implementation in Erlang of the Raft algorithm.
 
 ## Project implementation
 
+#### Requirements: OTP 24
 
-Build
------
+## Build
 
     $ rebar3 do clean, compile
 
