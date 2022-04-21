@@ -20,6 +20,7 @@
 	 scan_ts/1,
 	 scan_ts/2,
 	 traverse/1,
+	 select_all/1,
          update_cluster_metadata/1,
          update_cluster_metadata/2,
 	 get_cluster_metadata/1
@@ -65,6 +66,7 @@ open_tables() ->
 -spec close_tables() -> term().
 close_tables() ->
    try
+      dets:sync(sysDisk),	   
       dets:close(sysDisk),
       ets:delete(sysRam),
       ets:delete(sysIndex),
@@ -124,6 +126,7 @@ open_table(TSName) ->
 %%
 -spec close_table(string()) -> term().
 close_table(TSName) ->
+   %dets:sync(TSName),
    dets:close(TSName).
 
 %% @doc phisically deletes TSName's datafiles 
@@ -161,6 +164,7 @@ insert_ts(TSName, Value) ->
    try	
       ?MODULE:open_table(TSName),
       dets:insert(TSName, Value),
+      dets:sync(TSName),
       ?MODULE:close_table(TSName),
       {ok, Value}
    catch
@@ -180,8 +184,6 @@ lookup_table(TSName, Pattern) ->
   try
    ?MODULE:open_table(TSName),
    EtsRet  = dets:lookup(TSName, Pattern),
-   % TO DO: load dets into ets at first lookup
-   %DetsRet = ets:lookup(TSName, Value),
    ?MODULE:close_table(TSName),
    {ok, EtsRet}
   catch
@@ -222,6 +224,7 @@ match_delete_ts(TSName, Pattern) ->
    {_, Ret} = ?MODULE:match_ts(TSName, Pattern),
    ?MODULE:open_table(TSName),
    dets:match_delete(TSName, Pattern),
+   dets:sync(TSName),
    ?MODULE:close_table(TSName),
    {ok, Ret}
   catch
@@ -291,6 +294,28 @@ traverse(TSName) ->
       error:Error -> {error, Error}
    end.
 
+%% @doc Gets all the records of a TS in a list
+%% for debug purposes
+%%
+%% @param TSName = string()
+%%
+%% @returns [tuple()]|{error, Error}
+%%
+%% @end
+%%
+-spec select_all(string()) -> term().
+select_all(TSName) ->
+   try
+      ?MODULE:open_table(TSName),
+      List = dets:traverse(TSName, fun(X) -> {continue, X} end),
+      ?MODULE:close_table(TSName),
+      List
+   catch
+      error:Error -> {error, Error}
+   end.
+
+
+
 %% @doc Updates cluster's metadata with the given data
 %%
 %% @param Cluster
@@ -303,6 +328,7 @@ traverse(TSName) ->
 update_cluster_metadata(Cluster) ->
 	ets:insert(sysRam, Cluster),
 	dets:insert(sysDisk, Cluster),
+	dets:sync(sysDisk),
 	ok.
 
 %% @doc Updates cluster's metadata with the given data
@@ -317,7 +343,8 @@ update_cluster_metadata(Cluster) ->
 update_cluster_metadata(Cluster, Mode) ->
    case Mode of
       ram -> ets:insert(sysRam, Cluster);
-     disk -> dets:insert(sysDisk, Cluster);
+     disk -> dets:insert(sysDisk, Cluster),
+	     dets:sync(sysDisk);
      both -> update_cluster_metadata(Cluster)
    end,
    {ok, Cluster}.

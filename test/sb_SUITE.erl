@@ -81,11 +81,12 @@ sb_interface_1_test(_Config) ->
 
    % create new  metadata
    sbcli:create_cluster_metadata(),
+   
+   timer:sleep(2000),
 
    % start
    sbcli:start(),
 
-   timer:sleep(2000),
 
    % create a new tuple space
    sbcli:new(adcc),
@@ -118,11 +119,11 @@ sb_interface_2_test(_Config) ->
    
    % create new  metadata
    sbcli:create_cluster_metadata(),
+   
+   timer:sleep(2000),
 
    % start
    sbcli:start(),
-
-   timer:sleep(2000),
 
    % create a new tuple space
    sbcli:new(adcc),
@@ -137,48 +138,66 @@ sb_interface_2_test(_Config) ->
 
 
 sb_interface_3_test(_Config) ->
-   % create new  metadata
+   % Create new  metadata
    sbcli:create_cluster_metadata(),
+   
+   timer:sleep(1000),
 
-   % start
+   % Start the cluster
    sbcli:start(),
 
-   % get the Fully Qualified Domain Name
-   {ok, FQDN} = net_adm:dns_hostname(net_adm:localhost()),
+   timer:sleep(1000),
 
-   % Node names
-    Node1  = list_to_atom(atom_to_list('ra1@') ++ FQDN),
-   %Node2  = list_to_atom(atom_to_list('ra2@') ++ FQDN),
-   %Node3  = list_to_atom(atom_to_list('ra3@') ++ FQDN),
-   %Node4  = list_to_atom(atom_to_list('ra4@') ++ FQDN),
-
-   timer:sleep(2000),
+   {ok, Ln} = application:get_env(system_metadata, cluster),
+   [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, Ln),
 
    TS = adcc,
 
-   % create a new tuple space
+   NumberOfTuples = 100,
+
+   % Create a new tuple space
    sbcli:new(TS),
 
-   % it is supposed node() is the Leader node
-   ?assertMatch(true, ?MODULE:datafile_exists(TS, node())),
-
-   sbcli:addNode(TS, Node1),
+   % Replicate the tuple space on all of the cluster nodes
+   [sbcli:addNode(TS, N) || N <- Nodes],
    
    timer:sleep(1000),
 
-   ?assertMatch(true, ?MODULE:datafile_exists(TS, Node1)),
+   % The TS's datafile now must exists on all nodes
+   [?assertMatch(true, ?MODULE:datafile_exists(TS, N)) || N <- Nodes],
 
-   sbcli:removeNode(TS, Node1),
+   % Generate a list of random tuples   
+   ListOfTuples = [{Idx, rand:uniform(1000)} || Idx <- lists:seq(1, NumberOfTuples)],
+
+   % Insert the tuples on the TS
+   [sbcli:out(TS, T) || T <- ListOfTuples],
+   
+   % Allow some time to flush the buffers
+   timer:sleep(1000),
+
+   % Check that the stored tuples are the very same we have inserted before, on all nodes
+   % [?assertMatch(true, lists:reverse(ListOfTuples) =:= sbcli:select_all(TS, N)) ||  N <- Nodes],
+
+   % An alternative way to do the above. More reliable. Stored data on the TS must be the same on all nodes replica of the TS
+   [[?assertMatch(true, lists:member(lists:nth(Elem, ListOfTuples), sbcli:select_all(TS, N))) || Elem <- lists:seq(1, NumberOfTuples)] || N <- Nodes ],
+
+   % To debug the test after the debug of the debug
+   % [ct:print("Node: ~p Data: ~p~n", [N, sbcli:select_all(TS, N)]) || N <- Nodes],
+
+   % Now remove the TS from all the nodes
+   [sbcli:removeNode(TS, N) || N <- Nodes],
    
    timer:sleep(1000),
 
-   ?assertMatch(false, ?MODULE:datafile_exists(TS, Node1)),
+   % The TS datafile must be gone on every node
+   [?assertMatch(false, ?MODULE:datafile_exists(TS, N)) || N <- Nodes],
 
-   % stop
+   % Done. Stop the cluster 
    sbcli:stop(),
+
    ok.
 
-
+% TO DO: remove
 sb_cluster_test(_Config) ->
    
    % get cluster nodes from env 

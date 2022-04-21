@@ -32,7 +32,7 @@
 	rd/3,
 
 	% interface 3
-	addNode/2,
+%	addNode/2,
 	removeNode/2,
 	nodes/1,
 
@@ -438,7 +438,19 @@ handle_info(Info, State) ->
 %%
 %% @end
 -spec handle_cast(atom(), term()) -> term().
-handle_cast(stop, State) -> {stop, normal, State}.
+%handle_cast(stop, State) -> {stop, normal, State}.
+
+handle_cast(Call, State) ->
+   case Call of
+      {removeNode, TS, Node} -> {Ret, List} = removeNode_(TS, Node);
+         {addNode, TS, Node} -> {Ret, List} = addNode_(TS, Node);	   
+                       stop  -> {Ret, List} = {stop, []}
+   end,
+   case {Ret, List} of   
+      {stop, []} -> {stop, normal, State}; 
+      {_, _} -> {noreply, State}	   
+   end.	   
+
 
 % Suspend execution with explicit call to methods
 
@@ -563,9 +575,11 @@ out(TS, Tuple) ->
 %% @returns term()
 %%
 %% @end
--spec addNode(string(), atom()) -> term().
-addNode(TS, Node) ->
-   gen_server:call(?MODULE, {addNode, TS, Node}).
+%-spec addNode(string(), atom()) -> term().
+%addNode(TS, Node) ->
+%   gen_server:call(?MODULE, {addNode, TS, Node}).
+%  Cast instead of call to avoid timeout when replicating large tables	   
+%   gen_server:cast(?MODULE, {addNode, TS, Node}).
 
 %% @doc removeNode
 %%

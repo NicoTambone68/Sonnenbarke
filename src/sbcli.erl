@@ -7,14 +7,13 @@
 -module(sbcli).
 
 -export([
-	 % Client functions
-%	 connect/0,
+	 % Cluster functions and utilities
 	 start/0,
 	 stop/0,
-%	 stop_node/1,
 	 metadata/0,
 	 create_cluster_metadata/0,
 	 set_leader/1,
+	 select_all/2,
 
 	 % Interface 1
 	 new/1,
@@ -36,7 +35,6 @@
 % Client utilities
 % TO DO: check cluster status
 % ok when connect is successf.
-%connect() -> {ok}.
 
 %% @doc Starts the cluster
 %%
@@ -108,11 +106,32 @@ set_leader(Node) ->
 create_cluster_metadata() ->
    {ok,L} = application:get_env(system_metadata, cluster),
    [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, L),
+   [{cluster_datafiles_home_dir, Dir}] = lists:filter(fun({X,_}) -> X == cluster_datafiles_home_dir end, L),
    try                                                                                                                                       
+      % On every node, delete old datafiles
+      [erpc:call(N, file, del_dir_r, [Dir ++ "/" ++ atom_to_list(N)], 1000) || N <- Nodes],
+      timer:sleep(500),
+      % On every node create new blank metadata 
       erpc:multicall(Nodes, sbsystem, create_cluster_metadata, [], 1000)                                                                                 
    catch                                                                                                                                     
       error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])                                                                  
    end.     
+
+%% @doc Gets a list containing all data from TS on Node
+%%
+%% @param TS = string(), Node = atom()
+%%
+%% @returns term()
+%%
+%% @end
+-spec select_all(string(), atom()) -> term().
+select_all(TS, Node) ->
+   try
+      erpc:call(Node, sbdbs, select_all, [TS], 1000)
+   catch
+      error:Reason -> {error, Reason}
+   end.
+
 
 % Interface 1
 

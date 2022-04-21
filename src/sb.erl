@@ -14,14 +14,10 @@
 	 state_enter/2,
 	 system_effects/1,
 	 command_effects/1,
-	 %
-	 %halt/0,
-	 %halt/1,
 
          %% Client api
 	 system_command/1,
 	 command/1,
-%	 broadcast_command/5,
 	 restart/0,
 
          %% Cluster management API
@@ -31,7 +27,6 @@
 	 update_all_metadata/0,
          start_cluster/0,
 	 stop_cluster/0
-%	 stop_node/0
         ]).
 
 % minimum required nodes to form a cluster
@@ -54,13 +49,6 @@ init(_Config) ->
 init() ->
    application:ensure_all_started(ra),
    init(init).
-
-% TO DO: remove this
-%stop_node() -> 
-%    io:format("Stopping node ~p~n", [node()]),
-%    net_kernel:stop(),
-%    timer:sleep(500),
-%    io:format("Node ~p stopped~n", [node()]).
 
 %% @doc ra_machine callback function
 %% This function allows to process messages sent to the cluster.
@@ -102,11 +90,12 @@ apply(_Meta, Param, State) ->
 	      % Any command wich modifies data must update metadata
 	      % This is done by the Leader through Effects
 	      Command = lists:nth(1, tuple_to_list(Value)),
+	      % CommandEffects = {mod_call, ?MODULE, command_effects, [Value]},
 	      case lists:member(Command, [new, in, out, 'addNode', 'removeNode']) of
 		      true  -> Effects = [{mod_call, ?MODULE, update_all_metadata, []}],
 			       {State, Reply, Effects};
 
-		      false -> {State, Reply}
+		      false -> {State, Reply} 
 	      end
 	end.
 
@@ -219,6 +208,8 @@ command_effects(Value) ->
 					 % so take care to pick the last element to copy from
                                          NodeFrom = lists:last(Nodes),
                                          copy_ts(TS, NodeFrom, Node),
+					 % §
+					 %spawn_link(node(), ?MODULE, copy_ts, [TS, NodeFrom, Node]),
                                          Return = {{addNode, TS, Node}, ok}
 			      end 
 		     end;
@@ -249,44 +240,10 @@ command_effects(Value) ->
 	   {nodes, TS} ->
 		   Return = sbts:nodes(TS);
 
-      % /////////////////////////////////////////////////////
-      % 
-      % This is an extra utility out of system specifications
-      % TO DO: remove
-      % /////////////////////////////////////////////////////
-%      {removeTS, TS} ->
-%		     {Result, Nodes} = sbts:nodes(TS),
-%		     case Result of
-%		        ok ->% Remove all the associated Nodes
-%			     [erpc:call(Node, sbts, removeNode, [TS, Node]) || Node <- Nodes],
-%			      % remove physical datafile in the given node
-%                             [erpc:call(Node, sbdbs, delete_table, [TS]) || Node <- Nodes];
-%
-%			 _ -> no_associated_nodes
-%		     end,
-%		     % Remove TS from the System Metadata
-%                     {_, ClusterMetaData} = sbsystem:get_cluster_metadata(),
-%                     ClusterNodes = ClusterMetaData?SYSTEM.nodes,
-%                     ?MODULE:broadcast_command(sbts, removeTS, [TS], 5000, ClusterNodes),
-%                     % Update system Metadata
-%                     Scn = sbsystem:get_scn(),
-%		     % TO DO: write_redo_log(scn, command)
-%		     % TO DO: put the following code in update_all_metadata/1
-%		     sbsystem:update_cluster_metadata(Scn),
-%                     {_, ClusterMetaDataUpdated} = sbsystem:get_cluster_metadata(),
-%                     update_followers_metadata(ClusterMetaDataUpdated),
-%		     Return = {{removeTS, TS}, ok};
 
 		     _ -> Return = {invalid_command}
      end,
      Return.
-
-%% TO DO: Remove
-%halt() ->
-%   sbdbs:halt().
-
-%halt(Timeout) ->
-%   sbdbs:halt(Timeout).
 
 %% @doc Abstract implementation of all the functions described as the "Interface 1/3"
 %% of the specifications. 
@@ -308,7 +265,7 @@ interface_1(Function, TS, Tuple) ->
    % Get the list of nodes associated with TS 
    {Result, Nodes} = sbts:nodes(TS),
    case Result of
-      ok ->  % Execute only on associate nodes
+      ok ->  % Execute only on associated nodes
              case lists:member(node(), Nodes) of
                 true -> Return = sbts:Function(TS, Tuple),
 			% out must send wake up signal new_tuple_in
@@ -326,17 +283,6 @@ interface_1(Function, TS, Tuple) ->
       _ -> Return = {err, ts_doesnt_exist}
    end,
    Return.
-
-
-% Execute Module:Function on the given nodes throgh erpc call
-% TO DO:remove
-%broadcast_command(Module, Function, Args, Timeout, Nodes) ->
-% io:format("Broadcasting command: ~p~n", [Function]), 
-%  try 
-%     erpc:multicall(Nodes, Module, Function, Args, Timeout)
-%  catch
-%     error:{erpc,noconnection} -> io:format("Node is not reachable~n", [])
-%  end.
 
 %% @doc Updates metadata on every node of the cluster but the leader node which is already updated.
 %% This function must be called solely by the leader through one of the Effects method.
