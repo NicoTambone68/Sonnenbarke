@@ -6,7 +6,7 @@
 #### Masters degree course of Applied Informatics UniUrb 
 #### Academic Year 2021/2022
 
-Written by Nicolò Tambone 309828
+author: Nicolò Tambone 309828
 
 ## Introduction
 
@@ -263,14 +263,24 @@ The code of the tests is available on the directory test of the repository. To e
 ```
 
 # Performances
-TO DO
+The test suite _timing_SUITE.erl_ has been developed to measure the execution time of the methods under different conditions. You may launch it through the shell script _timing.sh_ which takes care of some initializations and checks. The average execution time for each method is shown in the table below.
+
+| Method | Average Execution time (ms) 
+| ------ | ------ 
+| new	  | 28.37
+| addNode |	24
+| removeNode |	35
+| out	| 30.42
+| rd	| 26.33
+| in	| 38.61
 
 # Conclusions
-TO DO
+The raft algorithm, due to its clarity, allows to develop reliable distributed systems and to design systems for robustness. Ra is probably the best open source implementation of the Raft algorithm in Erlang. It is mature and reliable and definitely worths the effort to learn it and can be successfully adopted as the core of a cluster system. This project represents a wonderful training ground for learning to develop such kind of systems. Albeit simple and provided with basic methods, a tuple space management system can be the starting point for the development of much complex software such, for example, distributed database systems. Further developments can include the adoption of a better storage system. For the current project we have used _dets_ tables for simplicity. Nevertheless it would be interesting to evolve towards a more advanced storage system based on the _mnesia_ database.
 
 # Appendix
-## Why is this application named Sonnenbarke?
-Well, it is based on Ra which is the name of an open-source implementation of Raft, nevertheless also the name of a divinity of the ancient Egypt: the god Ra who is portrayed half human and half hawk. Ra wanders on two boats, one for the night and one for the day. The boat for the day is the Sun-boat, in german: Sonnenbarke. This is the title of a song of the german band Einstuerzende Neubauten, of whom I'm a massive fan. [Einstuerzende Neubauten, Sonnenbarke (from the album Silence is Sexy, Mute Records, 2000)](https://youtu.be/bcKz1GTZBJg).
+## Why is this project named Sonnenbarke?
+Well, it is based on Ra which is the name of an open-source implementation of Raft, nevertheless also the name of a divinity of the ancient Egypt: the god Ra who is portrayed half human and half hawk. Ra wanders on two boats, one for the night and one for the day. The boat for the day is the Sun-boat, in german: Sonnenbarke. This is the title of a song of the german band Einstuerzende Neubauten, of whom I'm a massive fan. 
+[Einstuerzende Neubauten, Sonnenbarke (from the album Silence is Sexy, Mute Records, 2000)](https://youtu.be/bcKz1GTZBJg).
 
 
 
