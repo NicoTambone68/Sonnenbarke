@@ -1,0 +1,81 @@
+#!/bin/bash
+
+export FQDN=`hostname --fqdn`
+
+case $1 in
+
+   start)
+
+      printf "Launching cluster nodes for manual testing\n"
+      
+      
+      # Note: we are going to make use of the terminal multiplexer utility screen
+      # we'll instantiate the shells without attaching to them
+      # we just need the nodes to be up
+      screen -S ra1 -d -m bash -c "rebar3 shell --name ra1@$FQDN"
+      screen -S ra2 -d -m bash -c "rebar3 shell --name ra2@$FQDN"
+      screen -S ra3 -d -m bash -c "rebar3 shell --name ra3@$FQDN"
+      screen -S ra4 -d -m bash -c "rebar3 shell --name ra4@$FQDN"
+      
+      
+      printf "Checking the cluster nodes...\n"
+      
+      RA1=`ps -ef | grep rebar3 | awk '/ra1/' | wc -l`
+      RA2=`ps -ef | grep rebar3 | awk '/ra2/' | wc -l`
+      RA3=`ps -ef | grep rebar3 | awk '/ra3/' | wc -l`
+      RA4=`ps -ef | grep rebar3 | awk '/ra4/' | wc -l`
+      
+      CHK=0
+      
+      if [ $RA1 -lt 1 ]; then
+      	printf "node ra1 must be ready!\n"
+      	CHK=-1
+      fi
+      
+      if [ $RA2 -lt 1 ]; then
+      	printf "node ra2 must be ready!\n"
+      	CHK=-1
+      fi
+      
+      if [ $RA3 -lt 1 ]; then
+      	printf "node ra3 must be ready!\n"
+      	CHK=-1
+      fi
+      
+      if [ $RA4 -lt 1 ]; then
+      	printf "node ra4 must be ready!\n"
+      	CHK=-1
+      fi
+      
+      if [ $CHK -lt 0 ]; then
+        printf "ERROR: One or more nodes not available. Please check!\n"	
+        exit -1
+      fi
+      
+      printf "Nodes ready\n"
+      
+      screen -ls
+      
+      printf "to connect to a node: screen -r <session_id>\n"
+      printf "e.g. screen -r ra4 \n"
+      printf "\n"
+      printf "connecting on ra4 console, please wait...\n"
+
+      sleep 3s
+
+      screen -r ra4
+
+      ;;
+
+   stop)
+      # kill the processes of all the cluster nodes open on the 
+      # terminal multiplexer utility
+      kill $(ps -ef|grep rebar3|grep SCREEN|awk '{print $2}')
+      
+      ;;
+
+   *)
+      echo $"Usage: $0 {start|stop}"
+      exit 1
+
+esac

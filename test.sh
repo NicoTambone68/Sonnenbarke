@@ -1,7 +1,20 @@
-printf "Starting automatized tests\n"
-printf "Be sure to have separate shells for ra1, ra2, ra3 and NOT ra4 \n"
+#!/bin/bash
+export FQDN=`hostname --fqdn`
 
-printf "Checking cluster nodes...\n"
+printf "Starting automatized tests\n"
+printf "..........................\n"
+printf "Launching cluster nodes\n"
+
+
+# Note: we are going to make use of the terminal multiplexer utility screen
+# we'll instantiate the shells without attaching to them
+# we just need the nodes to be up
+screen -d -m bash -c "rebar3 shell --name ra1@$FQDN"
+screen -d -m bash -c "rebar3 shell --name ra2@$FQDN"
+screen -d -m bash -c "rebar3 shell --name ra3@$FQDN"
+
+
+printf "Checking the cluster nodes...\n"
 
 RA1=`ps -ef | grep rebar3 | awk '/ra1/' | wc -l`
 RA2=`ps -ef | grep rebar3 | awk '/ra2/' | wc -l`
@@ -37,7 +50,6 @@ fi
 
 printf "Nodes ok, now starting tests...\n"
 
-export FQDN=`hostname --fqdn`
 
 printf "Clearing _build/test\n"
 
@@ -49,8 +61,15 @@ export nodename="ra4@${FQDN}"
 
 printf "Running test as %s\n" $nodename
 
+# launch the automated tests
 rebar3 ct --name=$nodename --suite=test/sb_SUITE
 
+printf "Closing the cluster nodes\n"
+
+sleep 1s
+
+# kill the processes of all the cluster nodes open on the 
+# terminal multiplexer utility
+kill $(ps -ef|grep rebar3|grep SCREEN|awk '{print $2}')
 
 printf "Done. Cheers\n"
-

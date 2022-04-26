@@ -191,6 +191,9 @@ command_effects(Value) ->
 
 
       {addNode, TS, Node} ->
+%         sbts:addNode(TS, Node),
+%         Return = {{addNode, TS, Node}, ok};
+
 		     {_, Nodes} = sbts:nodes(TS),
 		     case Nodes of
 		        [tuple_space_does_not_exist] ->
@@ -207,29 +210,29 @@ command_effects(Value) ->
 					 % Note that the new node is added to the Head of the list
 					 % so take care to pick the last element to copy from
                                          NodeFrom = lists:last(Nodes),
-                                         copy_ts(TS, NodeFrom, Node),
-					 % §
-					 %spawn_link(node(), ?MODULE, copy_ts, [TS, NodeFrom, Node]),
+                                         sbts:copy_ts(TS, NodeFrom, Node),
                                          Return = {{addNode, TS, Node}, ok}
 			      end 
 		     end;
 
 
       {removeNode, TS, Node} ->
-		     {Result, Nodes} = sbts:nodes(TS),
+		     % {Result, Nodes} = sbts:nodes(TS),
+		     {Result, _} = sbts:nodes(TS),
 		     case Result of
 		        ok -> sbts:removeNode(TS, Node),
 			      % remove physical datafile 
 			      % delete it only in the given Node
-			      case node() of
-                                 Node -> sbdbs:delete_table(TS),
+			      case Node =:= node() of
+                                 true -> sbdbs:delete_table(TS),
 		                         % What if we remove the only associated node? Remove TS as well
+					 {_, Nodes} = sbts:nodes(TS),
                                          case length(Nodes) of
                                             1 -> sbts:removeTS(TS);
                                             _ -> ok
 		                          end;
 
-				      _ -> nothing_to_do
+                                false -> nothing_to_do
 			      end;
 
 			 _ -> ts_doesnt_exist
@@ -342,7 +345,7 @@ system_command(Value) ->
 -spec command(term()) -> term().
 command(Command) ->
     ClusterName = sbsystem:get_cluster_name(),
-    {Result, Reply, _Leader} = ra:process_command({ClusterName, node()}, {command, Command}),
+    {Result, Reply, _Leader} = ra:process_command({ClusterName, node()}, {command, Command}, 20000),
     {Result, Reply}.
 
 
@@ -570,41 +573,4 @@ stopping_sequence() ->
 create_cluster_metadata() ->
    sbsystem:create_cluster_metadata().
    
-%% @doc Copies TS data from NodeFrom to NodeTo
-%%
-%% @param Tuple Space Name, NodeFrom, NodeTo 
-%%
-%% @returns ok
-%%
-%% @end
-%%
--spec copy_ts(string(), atom(), atom()) -> term().
-copy_ts(TS, NodeFrom, NodeTo) ->
-   erpc:call(NodeFrom, sbdbs, open_table, [TS]),
-   erpc:call(NodeTo, sbdbs, open_table, [TS, create_if_not_exists]),
-   {List, Key} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS]),
-   case List of
-      % TS is empty. Done.
-      [] -> erpc:call(NodeFrom, sbdbs, close_table, [TS]),
-	    erpc:call(NodeTo, sbdbs, close_table, [TS]),
-	    ok;
-      % TS is not empty. Copy the first record to the NodeTO
-      _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1,List)]),
-	    % Repeat recursively
-	    copy_ts(TS, NodeFrom, NodeTo, Key)
-   end.
-
--spec copy_ts(string(), atom(), atom(), term()) -> term().
-copy_ts(TS, NodeFrom, NodeTo, Key) ->
-   {NextList, NextKey} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS, Key]),
-   case NextList of
-      % TS is empty. Done
-      [] -> erpc:call(NodeFrom, sbdbs, close_table, [TS]),
-	    erpc:call(NodeTo, sbdbs, close_table, [TS]),
-	    ok;
-      % TS is not empty. Copy Tuple to Node To
-      _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1, NextList)]),
-	    % Repeat recursively
-	    copy_ts(TS, NodeFrom, NodeTo, NextKey)
-   end.
 

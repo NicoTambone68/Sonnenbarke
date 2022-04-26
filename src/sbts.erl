@@ -32,14 +32,16 @@
 	rd/3,
 
 	% interface 3
-%	addNode/2,
+	addNode/2,
 	removeNode/2,
 	nodes/1,
 
 	% utilities not in system requirements
 	removeTS/1,
+	copy_ts/3,
+	copy_ts/4,
 	
-	% TEST delete after test
+	% private funcs
 	addNode_/2,
 	removeNode_/2,
 	removeTS_/1,
@@ -164,43 +166,67 @@ out_(TS, Tuple) ->
 %% @returns term()
 %%
 %% @end
+%%
 -spec addNode_(string(), atom()) -> term().
 addNode_(TS, Node) -> 
- try
-   % get current metadata
-   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
-   % check wheter Node belongs to the cluster or not
-   NodeIsRegistered = lists:member(Node, ClusterMetadata?SYSTEM.nodes), 
-   if NodeIsRegistered == false -> 
-      erlang:error(not_a_cluster_node);
-      true -> ok
-   end,
-   % check wheter Tuple Space TS is already registered into Metadata
-   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
-   if TSisRegistered == false -> 
-      erlang:error(tuple_space_does_not_exist);
-      true -> ok
-   end,
-   % Take TS data from Metadata
-   OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
-   % Take The list of nodes associated with TS
-   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
-   % Add the new list of nodes to the TS
-   % TS = [{Name, [Leader]} | ClusterMetadata?SYSTEM.ts],
-   NewTS = {TS, [Node | Nodes]}, %{TS, lists:append(Nodes, Node)},
-   % Remove old TS data from TSList
-   TSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
-   % Add the tuple {TS,[Nodes]} to the TSList
-   NewTSList = [NewTS | TSList], %lists:append(TSList, NewTS),
-   % Store the updated metadata on a peg variable
-   CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
-   % Save the updated metadata to ram and disk
-   sbdbs:update_cluster_metadata(CMetaUpdated, both),
-   % TO DO: replicate TS.dets on the new node
-   {ok, [TS, NewTSList]}
- catch
-    error:Error -> {error, Error}
- end.	 
+     {_, Nodes} = ?MODULE:nodes(TS),
+     case Nodes of
+        [tuple_space_does_not_exist] ->
+           ?MODULE:new(TS, Node),
+           {ok, [Node]};
+                     
+         % TS already on cluster. Add Node if not a member of the TS
+	 _ -> case lists:member(Node, Nodes) of
+                 true -> {ok, [Node]};
+
+		false -> ?MODULE:new(TS, Node),
+			 % Note that the new node is added to the Head of the list
+			 % so take care to pick the last element to copy from
+                         NodeFrom = lists:last(Nodes),
+                         ?MODULE:copy_ts(TS, NodeFrom, Node),
+			 {ok, [Node]}
+	      end 
+     end.
+
+%% TO DO:remove
+%%
+%-spec addNode_(string(), atom()) -> term().
+%addNode_(TS, Node) -> 
+% try
+%   % get current metadata
+%   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
+%   % check wheter Node belongs to the cluster or not
+%   NodeIsRegistered = lists:member(Node, ClusterMetadata?SYSTEM.nodes), 
+%   if NodeIsRegistered == false -> 
+%      erlang:error(not_a_cluster_node);
+%      true -> ok
+%   end,
+%   % check wheter Tuple Space TS is already registered into Metadata
+%   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
+%   if TSisRegistered == false -> 
+%      erlang:error(tuple_space_does_not_exist);
+%      true -> ok
+%   end,
+%   % Take TS data from Metadata
+%   OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+%   % Take The list of nodes associated with TS
+%   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
+%   % Add the new list of nodes to the TS
+%   % TS = [{Name, [Leader]} | ClusterMetadata?SYSTEM.ts],
+%   NewTS = {TS, [Node | Nodes]}, %{TS, lists:append(Nodes, Node)},
+%   % Remove old TS data from TSList
+%   TSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
+%   % Add the tuple {TS,[Nodes]} to the TSList
+%   NewTSList = [NewTS | TSList], %lists:append(TSList, NewTS),
+%   % Store the updated metadata on a peg variable
+%   CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
+%   % Save the updated metadata to ram and disk
+%   sbdbs:update_cluster_metadata(CMetaUpdated, both),
+%   % TO DO: replicate TS.dets on the new node
+%   {ok, [TS, NewTSList]}
+% catch
+%    error:Error -> {error, Error}
+% end.	 
 
 %% @doc Implements removeNode
 %%
@@ -575,11 +601,9 @@ out(TS, Tuple) ->
 %% @returns term()
 %%
 %% @end
-%-spec addNode(string(), atom()) -> term().
-%addNode(TS, Node) ->
-%   gen_server:call(?MODULE, {addNode, TS, Node}).
-%  Cast instead of call to avoid timeout when replicating large tables	   
-%   gen_server:cast(?MODULE, {addNode, TS, Node}).
+-spec addNode(string(), atom()) -> term().
+addNode(TS, Node) ->
+   gen_server:call(?MODULE, {addNode, TS, Node}).
 
 %% @doc removeNode
 %%
@@ -613,3 +637,41 @@ nodes(TS) ->
 -spec removeTS(string()) -> term().
 removeTS(TS) ->
    gen_server:call(?MODULE, {removeTS, TS}).
+
+%% @doc Copies TS data from NodeFrom to NodeTo
+%%
+%% @param Tuple Space Name, NodeFrom, NodeTo 
+%%
+%% @returns ok
+%%
+%% @end
+%%
+-spec copy_ts(string(), atom(), atom()) -> term().
+copy_ts(TS, NodeFrom, NodeTo) ->
+   erpc:call(NodeFrom, sbdbs, open_table, [TS]),
+   erpc:call(NodeTo, sbdbs, open_table, [TS, create_if_not_exists]),
+   {List, Key} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS]),
+   case List of
+      % TS is empty. Done.
+      [] -> erpc:call(NodeFrom, sbdbs, close_table, [TS]),
+	    erpc:call(NodeTo, sbdbs, close_table, [TS]),
+	    ok;
+      % TS is not empty. Copy the first record to the NodeTO
+      _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1,List)]),
+	    % Repeat recursively
+	    copy_ts(TS, NodeFrom, NodeTo, Key)
+   end.
+
+-spec copy_ts(string(), atom(), atom(), term()) -> term().
+copy_ts(TS, NodeFrom, NodeTo, Key) ->
+   {NextList, NextKey} = erpc:call(NodeFrom, sbdbs, scan_ts, [TS, Key]),
+   case NextList of
+      % TS is empty. Done
+      [] -> erpc:call(NodeFrom, sbdbs, close_table, [TS]),
+	    erpc:call(NodeTo, sbdbs, close_table, [TS]),
+	    ok;
+      % TS is not empty. Copy Tuple to Node To
+      _  -> erpc:call(NodeTo, sbts, out, [TS, lists:nth(1, NextList)]),
+	    % Repeat recursively
+	    copy_ts(TS, NodeFrom, NodeTo, NextKey)
+   end.
