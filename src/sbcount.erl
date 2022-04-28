@@ -1,5 +1,5 @@
-%%
-%%
+%% This Source Code Form is subject to the terms of the Apache License 2.0
+%% Copyright (c) 2022 Nicolò Tambone
 %%
 %% @doc This module is for generating an unique integer
 %% which is used by the cluster to mark every transaction with an Scn (System Change Number)

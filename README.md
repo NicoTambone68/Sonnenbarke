@@ -120,7 +120,7 @@ Choose one of the open shells and start the cluster with the following command:
 The cluster will perform initialization, showing a series of output messages like the following
 ```
 Sonnenbarke. A tuple space management system with Ra
-Nicolò Tambone - UniUrb ADCC
+written by: Nicolò Tambone - UniUrb ADCC
 Connecting to node ra1@adcc-lab.example.com: ok
 Connecting to node ra2@adcc-lab.example.com: ok
 Connecting to node ra3@adcc-lab.example.com: ok
@@ -261,6 +261,35 @@ The code of the tests is available on the directory test of the repository. To e
 ```
     $ ./test.sh
 ```
+This script will automatically deploy the nodes by means of the terminal multiplexer _screen_, then it will perform some checks and launch the predefined automatized tests. For more details, please refer to the code in the _test_ directory.
+
+# Manual testing and evaluation
+To ease the hands-on experience, you can use the _sbconsole_ utility. It deploys all the needed nodes by means of the _screen_ terminal multiplexer, launching the erlang shell through _rebar3_ on each of them. You will be logged in with node _ra4_ automatically. You will have to operate manually from this time on, starting, operating and stopping the cluster.
+To start the Sonnenbarke console, you have to type the following command from the home directory of the application
+```
+    $ ./sbconsole start
+```
+Then you'll see the following output just before logging in to the erlang console
+``` 
+Launching cluster nodes for manual testing
+Checking the cluster nodes...
+Nodes ready
+There are screens on:
+        735493.ra4      (Detached)
+        735477.ra3      (Detached)
+        735444.ra2      (Detached)
+        735441.ra1      (Detached)
+4 Sockets in /run/screen/S-nick.
+to connect to a node: screen -r <session_id>
+e.g. screen -r ra4 
+
+connecting on ra4 console, please wait...
+``` 
+After the tests, you'll have to close the utility by means of the following command
+```
+    $ ./sbconsole stop
+```
+This will terminate the terminal multiplexer in background.
 
 # Performances
 The test suite _timing_SUITE.erl_ has been developed to measure the execution time of the methods under different conditions. You may launch it through the shell script _timing.sh_ which takes care of some initializations and checks. The average execution time for each method is shown in the table below.
@@ -273,6 +302,12 @@ The test suite _timing_SUITE.erl_ has been developed to measure the execution ti
 | out	| 30.42
 | rd	| 26.33
 | in	| 38.61
+
+# Other tools
+The shell script _timing.sh_ has been provided for a rough performance evaluation, and the script _ziplogs.sh_ will produce a compressed archive of the test logs.
+
+# Documentation
+The directory doc contains the API documentation produced with the erlang utility edoc
 
 # Conclusions
 The raft algorithm, due to its clarity, allows to develop reliable distributed systems and to design systems for robustness. Ra is probably the best open source implementation of the Raft algorithm in Erlang. It is mature and reliable and definitely worths the effort to learn it and can be successfully adopted as the core of a cluster system. This project represents a wonderful training ground for learning to develop such kind of systems. Albeit simple and provided with basic methods, a tuple space management system can be the starting point for the development of much complex software such, for example, distributed database systems. Further developments can include the adoption of a better storage system. For the current project we have used _dets_ tables for simplicity. Nevertheless it would be interesting to evolve towards a more advanced storage system based on the _mnesia_ database.

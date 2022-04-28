@@ -1,5 +1,5 @@
-%%
-%%
+%% This Source Code Form is subject to the terms of the Apache License 2.0
+%% Copyright (c) 2022 Nicolò Tambone
 %%
 %% @doc This module implements a minimal CLI for interacting with the Tuple Space.
 %% It's mainly a wrapper for the sb module's functions 
@@ -33,8 +33,6 @@
        ]).
 
 % Client utilities
-% TO DO: check cluster status
-% ok when connect is successf.
 
 %% @doc Starts the cluster
 %%
@@ -57,17 +55,6 @@ start() ->
 -spec stop() -> term().
 stop() ->
    sb:stop_cluster().	
-
-%% @doc 
-%%
-%% @param 
-%%
-%% @returns
-%%
-%% @end
-
-%stop_node(Node) ->
-%   erpc:call(Node, sb, stop_node, [], 5000).
 
 %% @doc gets current metadata  
 %%

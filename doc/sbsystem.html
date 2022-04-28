@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module sbsystem</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module sbsystem</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module is an interface to handle cluster metadata during runtime
+  Its purpose is to provide efficiently cluster state informations.
+
+<p><b>Behaviours:</b> <a href="gen_server.html"><tt>gen_server</tt></a>.</p>
+
+<h2><a name="description">Description</a></h2>This module is an interface to handle cluster metadata during runtime
+  Its purpose is to provide efficiently cluster state informations
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#am_i_leader-0">am_i_leader/0</a></td><td>Returns true if the current node is leader, otherwise returns false.</td></tr>
+<tr><td valign="top"><a href="#create_cluster_metadata-0">create_cluster_metadata/0</a></td><td>Create a new default metadata set.</td></tr>
+<tr><td valign="top"><a href="#get_cluster_metadata-0">get_cluster_metadata/0</a></td><td>Reads metadata from Ram.</td></tr>
+<tr><td valign="top"><a href="#get_cluster_metadata-1">get_cluster_metadata/1</a></td><td>Reads metadata from either disk or ram.</td></tr>
+<tr><td valign="top"><a href="#get_cluster_name-0">get_cluster_name/0</a></td><td>Returns the name of the cluster.</td></tr>
+<tr><td valign="top"><a href="#get_scn-0">get_scn/0</a></td><td>Gets the current Scn.</td></tr>
+<tr><td valign="top"><a href="#handle_call-3">handle_call/3</a></td><td>Callback function of the gen_server
+  Implements the calls set above.</td></tr>
+<tr><td valign="top"><a href="#handle_cast-2">handle_cast/2</a></td><td>Callback function for gen_server stopping.</td></tr>
+<tr><td valign="top"><a href="#init-1">init/1</a></td><td>Initializes the module.</td></tr>
+<tr><td valign="top"><a href="#set_cluster_status-1">set_cluster_status/1</a></td><td>Sets the current status of the cluster
+  currently closed | open
+  Other states will be added in further developments.</td></tr>
+<tr><td valign="top"><a href="#start-0">start/0</a></td><td>Start the gen_server.</td></tr>
+<tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Gently stops the gen_server, terminate and close the open tables
+  See handle_cast for more details.</td></tr>
+<tr><td valign="top"><a href="#update_cluster_metadata-1">update_cluster_metadata/1</a></td><td>Updates the metadata on the current node
+  writing the given Scn.</td></tr>
+<tr><td valign="top"><a href="#update_cluster_metadata-2">update_cluster_metadata/2</a></td><td>Updates metadata Tuple Space field with the list Nodes associated with the Tuple Space TS.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="am_i_leader-0">am_i_leader/0</a></h3>
+<div class="spec">
+<p><tt>am_i_leader() -&gt; boolean()</tt><br></p>
+<p> </p>
+<p>returns: atom()
+ </p>
+</div><p>Returns true if the current node is leader, otherwise returns false
+ </p>
+
+<h3 class="function"><a name="create_cluster_metadata-0">create_cluster_metadata/0</a></h3>
+<div class="spec">
+<p><tt>create_cluster_metadata() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Create a new default metadata set. WARNING! Overwrites existing data
+ </p>
+
+<h3 class="function"><a name="get_cluster_metadata-0">get_cluster_metadata/0</a></h3>
+<div class="spec">
+<p><tt>get_cluster_metadata() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Reads metadata from Ram
+ </p>
+
+<h3 class="function"><a name="get_cluster_metadata-1">get_cluster_metadata/1</a></h3>
+<div class="spec">
+<p><tt>get_cluster_metadata(From::atom()) -&gt; term()</tt><br></p>
+<p><tt>From</tt>: = atom() = disk | ram
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Reads metadata from either disk or ram
+ </p>
+
+<h3 class="function"><a name="get_cluster_name-0">get_cluster_name/0</a></h3>
+<div class="spec">
+<p><tt>get_cluster_name() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Returns the name of the cluster
+ </p>
+
+<h3 class="function"><a name="get_scn-0">get_scn/0</a></h3>
+<div class="spec">
+<p><tt>get_scn() -&gt; integer()</tt><br></p>
+<p> </p>
+<p>returns: integer()
+ </p>
+</div><p>Gets the current Scn
+ </p>
+
+<h3 class="function"><a name="handle_call-3">handle_call/3</a></h3>
+<div class="spec">
+<p><tt>handle_call(Call::term(), From::term(), X3::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Callback function of the gen_server
+  Implements the calls set above
+ </p>
+
+<h3 class="function"><a name="handle_cast-2">handle_cast/2</a></h3>
+<div class="spec">
+<p><tt>handle_cast(X1::atom(), State::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Callback function for gen_server stopping
+ </p>
+
+<h3 class="function"><a name="init-1">init/1</a></h3>
+<div class="spec">
+<p><tt>init(Args::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Initializes the module
+ </p>
+
+<h3 class="function"><a name="set_cluster_status-1">set_cluster_status/1</a></h3>
+<div class="spec">
+<p><tt>set_cluster_status(Status::atom()) -&gt; term()</tt><br></p>
+<p><tt>Status</tt>: = atom() = closed | open
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Sets the current status of the cluster
+  currently closed | open
+  Other states will be added in further developments
+ </p>
+
+<h3 class="function"><a name="start-0">start/0</a></h3>
+<div class="spec">
+<p><tt>start() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Start the gen_server
+ </p>
+
+<h3 class="function"><a name="stop-0">stop/0</a></h3>
+<div class="spec">
+<p><tt>stop() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Gently stops the gen_server, terminate and close the open tables
+  See handle_cast for more details
+ </p>
+
+<h3 class="function"><a name="update_cluster_metadata-1">update_cluster_metadata/1</a></h3>
+<div class="spec">
+<p><tt>update_cluster_metadata(Scn::integer()) -&gt; term()</tt><br></p>
+<p><tt>Scn</tt>: = integer()
+ <br>
+</p>
+<p>returns: {ok, Metadata = term()}
+ </p>
+</div><p>Updates the metadata on the current node
+  writing the given Scn. The other metadata information remains unaffected
+ </p>
+
+<h3 class="function"><a name="update_cluster_metadata-2">update_cluster_metadata/2</a></h3>
+<div class="spec">
+<p><tt>update_cluster_metadata(TSName::string(), Nodes::[atom()]) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string, Nodes = [atom()]
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Updates metadata Tuple Space field with the list Nodes associated with the Tuple Space TS
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module sb</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module sb</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>The main module for starting, stopping and interacting with the Ra cluster.
+
+<p><b>Behaviours:</b> <a href="ra_machine.html"><tt>ra_machine</tt></a>.</p>
+
+<h2><a name="description">Description</a></h2>The main module for starting, stopping and interacting with the Ra cluster
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#apply-3">apply/3</a></td><td>ra_machine callback function
+  This function allows to process messages sent to the cluster.</td></tr>
+<tr><td valign="top"><a href="#command-1">command/1</a></td><td>Sends a TS command to the cluster.</td></tr>
+<tr><td valign="top"><a href="#command_effects-1">command_effects/1</a></td><td>Command interpreter.</td></tr>
+<tr><td valign="top"><a href="#create_cluster_metadata-0">create_cluster_metadata/0</a></td><td>Creates brand new empty metadata on the current node
+  WARNING: previous metadata will be overwritten.</td></tr>
+<tr><td valign="top"><a href="#get_cluster_metadata-1">get_cluster_metadata/1</a></td><td>Utility function to visualize the current cluster's metadata
+  (See sys_meta.hrl form metadata's structure).</td></tr>
+<tr><td valign="top"><a href="#init-0">init/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#init-1">init/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#leader_effects-1">leader_effects/1</a></td><td>The commands here must be executed exclusively by the leader
+  Moreover, the leader updates cluster's metadata and distributes
+  the updated copy to each node.</td></tr>
+<tr><td valign="top"><a href="#restart-0">restart/0</a></td><td>Restart a node previously started and then crashed.</td></tr>
+<tr><td valign="top"><a href="#start_cluster-0">start_cluster/0</a></td><td>Initializes and starts the cluster.</td></tr>
+<tr><td valign="top"><a href="#state_enter-2">state_enter/2</a></td><td>Callback function of the ra_machine.</td></tr>
+<tr><td valign="top"><a href="#stop_cluster-0">stop_cluster/0</a></td><td>Stop the cluster previously started.</td></tr>
+<tr><td valign="top"><a href="#system_command-1">system_command/1</a></td><td>Sends a system command to the cluster.</td></tr>
+<tr><td valign="top"><a href="#system_effects-1">system_effects/1</a></td><td>Reply function for internal System's messages
+  Sset the cluster state to the new state (open | close).</td></tr>
+<tr><td valign="top"><a href="#update_all_metadata-0">update_all_metadata/0</a></td><td>Updates Leader and followers metadata after a transaction
+  Every transaction il labeled with a unique Scn (System Change Number)
+  The currenta value of Scn is recorded into the cluster's metadata.</td></tr>
+<tr><td valign="top"><a href="#update_cluster_metadata-1">update_cluster_metadata/1</a></td><td>Update cluster's metadata with current data on both ram and disk.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="apply-3">apply/3</a></h3>
+<div class="spec">
+<p><tt>apply(Meta::term(), Param::term(), State::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: 
+  {State, Reply} | {State, Reply, Effects}
+ </p>
+</div><p>ra_machine callback function
+  This function allows to process messages sent to the cluster.
+  This is done by means of the Reply fucntion which is executed by each node
+  The optional Effects function is executed only by the Leader
+ </p>
+
+<h3 class="function"><a name="command-1">command/1</a></h3>
+<div class="spec">
+<p><tt>command(Command::term()) -&gt; term()</tt><br></p>
+<p><tt>Command</tt>: (see command_effects)
+ <br>
+</p>
+<p>returns: {Result, Reply}
+ </p>
+</div><p>Sends a TS command to the cluster
+ </p>
+
+<h3 class="function"><a name="command_effects-1">command_effects/1</a></h3>
+<div class="spec">
+<p><tt>command_effects(Value::term()) -&gt; term()</tt><br></p>
+<p><tt>Value</tt>: =  {new, Name, Node} | {out, TS, Tuple} | {rd, TS, Pattern}
+  | {in, TS, Pattern} | {addNode, TS, Node} | {removeNode, TS, node} | {nodes, TS}
+ <br>
+</p>
+<p>returns: 
+  Result of the operation | {invalid_command}
+ </p>
+</div><p>Command interpreter.
+  Commands implemented here are processed on each node
+ </p>
+
+<h3 class="function"><a name="create_cluster_metadata-0">create_cluster_metadata/0</a></h3>
+<div class="spec">
+<p><tt>create_cluster_metadata() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: none
+ </p>
+</div><p>Creates brand new empty metadata on the current node
+  WARNING: previous metadata will be overwritten
+ </p>
+
+<h3 class="function"><a name="get_cluster_metadata-1">get_cluster_metadata/1</a></h3>
+<div class="spec">
+<p><tt>get_cluster_metadata(From::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: {Response, ClusterMetdata)
+ </p>
+</div><p>Utility function to visualize the current cluster's metadata
+  (See sys_meta.hrl form metadata's structure)
+ </p>
+
+<h3 class="function"><a name="init-0">init/0</a></h3>
+<div class="spec">
+<p><tt>init() -&gt; term()</tt><br></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="init-1">init/1</a></h3>
+<div class="spec">
+<p><tt>init(Config::term()) -&gt; [ok]</tt><br></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="leader_effects-1">leader_effects/1</a></h3>
+<div class="spec">
+<p><tt>leader_effects(Value) -&gt; any()</tt></p>
+<p> </p>
+</div><p>The commands here must be executed exclusively by the leader
+  Moreover, the leader updates cluster's metadata and distributes
+  the updated copy to each node.
+ </p>
+
+<h3 class="function"><a name="restart-0">restart/0</a></h3>
+<div class="spec">
+<p><tt>restart() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: none
+ </p>
+</div><p>Restart a node previously started and then crashed
+ </p>
+
+<h3 class="function"><a name="start_cluster-0">start_cluster/0</a></h3>
+<div class="spec">
+<p><tt>start_cluster() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: ok | cluster_not_started
+ </p>
+</div><p>Initializes and starts the cluster.
+ </p>
+
+<h3 class="function"><a name="state_enter-2">state_enter/2</a></h3>
+<div class="spec">
+<p><tt>state_enter(X1::term(), X2::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: 
+  none
+ </p>
+</div><p>Callback function of the ra_machine. It's triggered whenever the cluster's state changes
+  Here we implement the callback to signal when a node becomes leader
+ </p>
+
+<h3 class="function"><a name="stop_cluster-0">stop_cluster/0</a></h3>
+<div class="spec">
+<p><tt>stop_cluster() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: cluster_stopped
+ </p>
+</div><p>Stop the cluster previously started
+ </p>
+
+<h3 class="function"><a name="system_command-1">system_command/1</a></h3>
+<div class="spec">
+<p><tt>system_command(Value::term()) -&gt; term()</tt><br></p>
+<p><tt>Value</tt>: (see system_effects)
+ <br>
+</p>
+<p>returns: Result
+ </p>
+</div><p>Sends a system command to the cluster
+ </p>
+
+<h3 class="function"><a name="system_effects-1">system_effects/1</a></h3>
+<div class="spec">
+<p><tt>system_effects(Value::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: 
+  when a wrong parameter was passed: {error, invalid_system_effect_parameter}
+ </p>
+</div><p>Reply function for internal System's messages
+  Sset the cluster state to the new state (open | close).
+  Update Leader metadata, then update all the followers metadata.
+ </p>
+
+<h3 class="function"><a name="update_all_metadata-0">update_all_metadata/0</a></h3>
+<div class="spec">
+<p><tt>update_all_metadata() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: 
+  none
+ </p>
+</div><p>Updates Leader and followers metadata after a transaction
+  Every transaction il labeled with a unique Scn (System Change Number)
+  The currenta value of Scn is recorded into the cluster's metadata
+ </p>
+
+<h3 class="function"><a name="update_cluster_metadata-1">update_cluster_metadata/1</a></h3>
+<div class="spec">
+<p><tt>update_cluster_metadata(ClusterMetaData::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: {ok, ClusterMetaData}
+ </p>
+</div><p>Update cluster's metadata with current data on both ram and disk
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

@@ -1,5 +1,5 @@
-%%
-%%
+%% This Source Code Form is subject to the terms of the Apache License 2.0
+%% Copyright (c) 2022 Nicolò Tambone
 %%
 %% @doc The main module for starting, stopping and interacting with the Ra cluster
 
@@ -14,6 +14,7 @@
 	 state_enter/2,
 	 system_effects/1,
 	 command_effects/1,
+	 leader_effects/1,
 
          %% Client api
 	 system_command/1,
@@ -83,7 +84,7 @@ apply(_Meta, Param, State) ->
              end,
 	     {NewState, Reply, Effects};
 	   {command, Value} ->
-              io:format("Received command ~p~n", [Value]),
+              io:format("Processing command: ~p~n", [Value]),
               % command_effects should be called through mod_call through Effects
 	      % but we need to send back Reply, so non blocking effects are called here
 	      Reply = ?MODULE:command_effects(Value),
@@ -92,12 +93,34 @@ apply(_Meta, Param, State) ->
 	      Command = lists:nth(1, tuple_to_list(Value)),
 	      % CommandEffects = {mod_call, ?MODULE, command_effects, [Value]},
 	      case lists:member(Command, [new, in, out, 'addNode', 'removeNode']) of
-		      true  -> Effects = [{mod_call, ?MODULE, update_all_metadata, []}],
+		      true  -> Effects = [{mod_call, ?MODULE, leader_effects, [Value]}],
 			       {State, Reply, Effects};
 
 		      false -> {State, Reply} 
 	      end
 	end.
+
+
+%% @doc The commands here must be executed exclusively by the leader
+%% Moreover, the leader updates cluster's metadata and distributes
+%% the updated copy to each node.
+%%
+%% @param 
+%% Value: {command, param1, ..., paramN}
+%%
+%% @returns 
+%% none
+%%
+%% @end
+%% 
+leader_effects(Value) ->
+   case Value of                                                                                                                         
+      {addNode, TS, Node} -> sbts:new(TS, Node);                                             
+          {new, TS, Node} -> sbts:new(TS, Node);
+                        _ -> do_nothing
+    end,
+   ?MODULE:update_all_metadata().
+
 
 %% @doc Reply function for internal System's messages
 %% Sset the cluster state to the new state (open | close).
@@ -142,7 +165,8 @@ update_all_metadata() ->
    {_, ClusterMetaData} = sbsystem:update_cluster_metadata(Scn),
    update_followers_metadata(ClusterMetaData).
 
-%% @doc Command interpreter 
+%% @doc Command interpreter.
+%% Commands implemented here are processed on each node
 %%
 %% @param Value =  {new, Name, Node} | {out, TS, Tuple} | {rd, TS, Pattern} 
 %% | {in, TS, Pattern} | {addNode, TS, Node} | {removeNode, TS, node} | {nodes, TS}
@@ -154,67 +178,19 @@ update_all_metadata() ->
 %%
 -spec command_effects(term()) -> term().
 command_effects(Value) ->
-   io:format("Received command: ~p~n", [Value]),
    case Value of
-      {new, Name, Node} -> 
-		     % Create a new TS Name on Node
-                     {_, Nodes} = sbts:nodes(Name),
-		     case Nodes of
-			% new TS only if it doesn't already exist on Node     
-			% first case is a brand new ts
-                        [tuple_space_does_not_exist] -> Action = new_name_node;
-                        % second case: ts already exists. we're going to check if it's on Node or not
-                                                   _ -> case lists:member(Node, Nodes) of
-								true -> Action = nothing_to_do;
-						               false -> Action = new_name_node
-							end
-                      end,            
-                      % Execute only if node() == Node and the tests above say go
-		      case (Action =:= new_name_node) and (node() =:= Node)  of
-                              true -> Return = sbts:new(Name, Node);
-
-                                 _ -> Return =  ok
-                      end;
-
-			     
+      {new, _, _} -> Return = ok;
 
       {out, TS, Tuple} ->	 
          Return = interface_1(out, TS, Tuple);
 
-
       {rd, TS, Pattern} ->
          Return = interface_1(rd, TS, Pattern);
-
 
       {in, TS, Pattern} ->
          Return = interface_1(in, TS, Pattern);
 
-
-      {addNode, TS, Node} ->
-%         sbts:addNode(TS, Node),
-%         Return = {{addNode, TS, Node}, ok};
-
-		     {_, Nodes} = sbts:nodes(TS),
-		     case Nodes of
-		        [tuple_space_does_not_exist] ->
-                              sbts:new(TS, Node),    %sbts:addNode(TS, Node);
-                              % NodeFrom = lists:nth(1, Nodes),
-                              % copy_ts(TS, NodeFrom, Node),
-                              Return = {{addNode, TS, Node}, ok};
-                        
-			 % TS already on cluster. Add Node if not a member of the TS
-			 _ -> case lists:member(Node, Nodes) of
-                                 true -> Return = {{addNode, TS, Node}, ok};
-
-				false -> sbts:new(TS, Node),
-					 % Note that the new node is added to the Head of the list
-					 % so take care to pick the last element to copy from
-                                         NodeFrom = lists:last(Nodes),
-                                         sbts:copy_ts(TS, NodeFrom, Node),
-                                         Return = {{addNode, TS, Node}, ok}
-			      end 
-		     end;
-
+      {addNode, _, _} -> Return = ok;
 
       {removeNode, TS, Node} ->
 		     % {Result, Nodes} = sbts:nodes(TS),
@@ -239,10 +215,8 @@ command_effects(Value) ->
 		     end,
 		     Return = {{removeNode, TS, Node}, ok};
 
-
 	   {nodes, TS} ->
 		   Return = sbts:nodes(TS);
-
 
 		     _ -> Return = {invalid_command}
      end,
@@ -439,7 +413,7 @@ check_active_nodes(Nodes) ->
 -spec start_cluster() -> term().
 start_cluster() ->
    io:format("Sonnenbarke. A tuple space management system with Ra~n", []),
-   io:format("Nicolò Tambone - UniUrb ADCC~n", []),
+   io:format("written by: Nicolò Tambone - UniUrb ADCC~n", []),
    {ok, RaHomeDir} = sbenv:get_cluster_env(ra_home_dir), 
    sbdbs:open_tables(),
    {Response, Cluster} = sbdbs:get_cluster_metadata(disk),

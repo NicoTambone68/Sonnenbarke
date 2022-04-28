@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module sbcli</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module sbcli</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module implements a minimal CLI for interacting with the Tuple Space.
+
+
+<h2><a name="description">Description</a></h2>This module implements a minimal CLI for interacting with the Tuple Space.
+  It's mainly a wrapper for the sb module's functions
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#addNode-2">addNode/2</a></td><td>Adds the Node to the TS.</td></tr>
+<tr><td valign="top"><a href="#create_cluster_metadata-0">create_cluster_metadata/0</a></td><td>Initialize new metadata on all nodes.</td></tr>
+<tr><td valign="top"><a href="#in-2">in/2</a></td><td>Returns a tuple matching the pattern in the TS and deletes it from the TS.</td></tr>
+<tr><td valign="top"><a href="#in-3">in/3</a></td><td>The same as the in above, but with a timeout.</td></tr>
+<tr><td valign="top"><a href="#metadata-0">metadata/0</a></td><td>gets current metadata.</td></tr>
+<tr><td valign="top"><a href="#new-1">new/1</a></td><td>Creates a new Tuple Space named as TS.</td></tr>
+<tr><td valign="top"><a href="#nodes-1">nodes/1</a></td><td>Tells the nodes on which the TS is visible/replicated.</td></tr>
+<tr><td valign="top"><a href="#out-2">out/2</a></td><td>Puts the tuple Tuple on the Tuple Space TS.</td></tr>
+<tr><td valign="top"><a href="#rd-2">rd/2</a></td><td>Returns a tuple matching the pattern in the TS
+  Blocks if there is no tuple matching.</td></tr>
+<tr><td valign="top"><a href="#rd-3">rd/3</a></td><td>The same as the rd above, but with a timeout.</td></tr>
+<tr><td valign="top"><a href="#removeNode-2">removeNode/2</a></td><td>Removes the Node from the TS.</td></tr>
+<tr><td valign="top"><a href="#select_all-2">select_all/2</a></td><td>Gets a list containing all data from TS on Node.</td></tr>
+<tr><td valign="top"><a href="#set_leader-1">set_leader/1</a></td><td>Set the cluster's current leader to Node.</td></tr>
+<tr><td valign="top"><a href="#start-0">start/0</a></td><td>Starts the cluster.</td></tr>
+<tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Stops the cluster.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="addNode-2">addNode/2</a></h3>
+<div class="spec">
+<p><tt>addNode(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Node = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Adds the Node to the TS
+ </p>
+
+<h3 class="function"><a name="create_cluster_metadata-0">create_cluster_metadata/0</a></h3>
+<div class="spec">
+<p><tt>create_cluster_metadata() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Initialize new metadata on all nodes.
+  Based on sys.config. Creates directories if not exist.
+  WARNING! overwrites previous data. Use with care.
+ </p>
+
+<h3 class="function"><a name="in-2">in/2</a></h3>
+<div class="spec">
+<p><tt>in(TS::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Pattern = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Returns a tuple matching the pattern in the TS and deletes it from the TS.
+  Blocks if there is no tuple matching
+ </p>
+
+<h3 class="function"><a name="in-3">in/3</a></h3>
+<div class="spec">
+<p><tt>in(TS::string(), Pattern::tuple(), Timeout::integer()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Pattern = tuple(), Timeout = integer()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>The same as the in above, but with a timeout
+ </p>
+
+<h3 class="function"><a name="metadata-0">metadata/0</a></h3>
+<div class="spec">
+<p><tt>metadata() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: Metadata = term()
+ </p>
+</div><p>gets current metadata
+ </p>
+
+<h3 class="function"><a name="new-1">new/1</a></h3>
+<div class="spec">
+<p><tt>new(TS::string()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Creates a new Tuple Space named as TS
+ </p>
+
+<h3 class="function"><a name="nodes-1">nodes/1</a></h3>
+<div class="spec">
+<p><tt>nodes(TS::string()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Tells the nodes on which the TS is visible/replicated
+ </p>
+
+<h3 class="function"><a name="out-2">out/2</a></h3>
+<div class="spec">
+<p><tt>out(TS::string(), Tuple::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Tuple = tuple()
+ <br>
+</p>
+<p>returns: 
+ </p>
+</div><p>Puts the tuple Tuple on the Tuple Space TS
+ </p>
+
+<h3 class="function"><a name="rd-2">rd/2</a></h3>
+<div class="spec">
+<p><tt>rd(TS::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Pattern = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Returns a tuple matching the pattern in the TS
+  Blocks if there is no tuple matching
+ </p>
+
+<h3 class="function"><a name="rd-3">rd/3</a></h3>
+<div class="spec">
+<p><tt>rd(TS::string(), Pattern::tuple(), Timeout::integer()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Pattern = tuple(), Timeout = integer()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>The same as the rd above, but with a timeout
+ </p>
+
+<h3 class="function"><a name="removeNode-2">removeNode/2</a></h3>
+<div class="spec">
+<p><tt>removeNode(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Node = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Removes the Node from the TS
+ </p>
+
+<h3 class="function"><a name="select_all-2">select_all/2</a></h3>
+<div class="spec">
+<p><tt>select_all(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Node = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Gets a list containing all data from TS on Node
+ </p>
+
+<h3 class="function"><a name="set_leader-1">set_leader/1</a></h3>
+<div class="spec">
+<p><tt>set_leader(Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>Node</tt>: = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Set the cluster's current leader to Node
+ </p>
+
+<h3 class="function"><a name="start-0">start/0</a></h3>
+<div class="spec">
+<p><tt>start() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Starts the cluster
+ </p>
+
+<h3 class="function"><a name="stop-0">stop/0</a></h3>
+<div class="spec">
+<p><tt>stop() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Stops the cluster
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

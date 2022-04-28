@@ -27,11 +27,11 @@ all() -> [{group, public}].
 
 groups() -> [
 	     {public, [shuffle], [
-%				  sb_basic_test,
-%				  sb_metadata_test,
-%				  sb_interface_1_test,
-%				  sb_interface_2_test,
-%				  sb_interface_3_testi,
+				  sb_basic_test,
+				  sb_metadata_test,
+				  sb_interface_1_test,
+				  sb_interface_2_test,
+                                  sb_interface_3_test,
                                   sb_node_replication_test
 				 ]}
 	    ].
@@ -52,7 +52,9 @@ end_per_suite(_, _) -> ok.
 
 sb_basic_test(_Config) ->
    sbcli:start(),
+   timer:sleep(2000),
    sbcli:stop(),
+   timer:sleep(1000),
    ok.
 
 % check for metadata consistency
@@ -74,6 +76,7 @@ sb_metadata_test(_Config) ->
    ?assert(lists:all(fun(X) -> X =:= lists:nth(1, NList) end, NList), "Metadata must be equal to each other's node"),
    % end
    sbcli:stop(),
+   timer:sleep(1000),
    ok.
 
 % interface #1 general test
@@ -87,6 +90,7 @@ sb_interface_1_test(_Config) ->
    % start
    sbcli:start(),
 
+   timer:sleep(2000),
 
    % create a new tuple space
    sbcli:new(adcc),
@@ -111,6 +115,7 @@ sb_interface_1_test(_Config) ->
 
    % stop
    sbcli:stop(),
+   timer:sleep(1000),
    ok.
 
 
@@ -125,6 +130,8 @@ sb_interface_2_test(_Config) ->
    % start
    sbcli:start(),
 
+   timer:sleep(2000),
+   
    % create a new tuple space
    sbcli:new(adcc),
 
@@ -134,6 +141,7 @@ sb_interface_2_test(_Config) ->
 
    % stop
    sbcli:stop(),
+   timer:sleep(1000),
    ok.
 
 
@@ -141,12 +149,12 @@ sb_interface_3_test(_Config) ->
    % Create new  metadata
    sbcli:create_cluster_metadata(),
    
-   timer:sleep(1000),
+   timer:sleep(2000),
 
    % Start the cluster
    sbcli:start(),
 
-   timer:sleep(1000),
+   timer:sleep(2000),
 
    {ok, Ln} = application:get_env(system_metadata, cluster),
    [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, Ln),
@@ -194,6 +202,8 @@ sb_interface_3_test(_Config) ->
 
    % Done. Stop the cluster 
    sbcli:stop(),
+   
+   timer:sleep(1000),
 
    ok.
 
@@ -208,7 +218,7 @@ sb_node_replication_test(_Config) ->
    % Start the cluster
    sbcli:start(),
 
-   timer:sleep(1000),
+   timer:sleep(2000),
 
    {ok, Ln} = application:get_env(system_metadata, cluster),
    [{nodes, Nodes}] = lists:filter(fun({X,_}) -> X == nodes end, Ln),
@@ -228,10 +238,16 @@ sb_node_replication_test(_Config) ->
    % List of the not replicated Nodes
    NotReplNodes = [N || N <- Nodes, (lists:member(N, ReplNodes) =:= false)],
 
+   io:format("Replicated Nodes ~p~n", [ReplNodes]),
+   io:format("Not Replicated Nodes ~p~n", [NotReplNodes]),
+
    % Replicate the tuple space on another random node 
    sbcli:addNode(TS, Node),
 
    timer:sleep(1000),
+
+   io:format("Datafiles on replicated nodes ~p~n", [{ [?MODULE:datafile_exists(TS, N) || N <- ReplNodes] }]),
+   io:format("Datafiles on NOT replicated nodes ~p~n", [{ [?MODULE:datafile_exists(TS, N) || N <- NotReplNodes] }]),
 
    % The TS's datafile now must exists on all the replicated nodes
    [?assertMatch(true, ?MODULE:datafile_exists(TS, N)) || N <- ReplNodes],
@@ -263,6 +279,8 @@ sb_node_replication_test(_Config) ->
 
    % Done. Stop the cluster 
    sbcli:stop(),
+
+   timer:sleep(1000),
 
    ok.
 

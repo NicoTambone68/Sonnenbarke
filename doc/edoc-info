@@ -1,0 +1,4 @@
+%% encoding: UTF-8
+{application,sonnenbarke}.
+{modules,[sb,sbcli,sbcount,sbdbs,sbenv,sbsystem,sbts,sonnenbarke_app,
+          sonnenbarke_sup]}.

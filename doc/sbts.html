@@ -1,0 +1,343 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module sbts</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module sbts</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module is for handling the tuple space methods.
+
+<p><b>Behaviours:</b> <a href="gen_server.html"><tt>gen_server</tt></a>.</p>
+
+<h2><a name="description">Description</a></h2>This module is for handling the tuple space methods
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#addNode-2">addNode/2</a></td><td>addNode.</td></tr>
+<tr><td valign="top"><a href="#addNode_-2">addNode_/2</a></td><td>Implements addNode.</td></tr>
+<tr><td valign="top"><a href="#copy_ts-3">copy_ts/3</a></td><td>Copies TS data from NodeFrom to NodeTo.</td></tr>
+<tr><td valign="top"><a href="#copy_ts-4">copy_ts/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#halt-0">halt/0</a></td><td>Suspend execution with explicit call to methods
+  The code here implements the reqired block when there's no matching with methods in and rd.</td></tr>
+<tr><td valign="top"><a href="#halt-1">halt/1</a></td><td>Implements halt with a timeout.</td></tr>
+<tr><td valign="top"><a href="#handle_call-3">handle_call/3</a></td><td>HandleCall callback function
+  NOTE: State is used to pass From to the outside
+  thus State must not be changed otherwise.</td></tr>
+<tr><td valign="top"><a href="#handle_cast-2">handle_cast/2</a></td><td>Callback for the stop call.</td></tr>
+<tr><td valign="top"><a href="#handle_info-2">handle_info/2</a></td><td>Manages the incoming messages and takes action accordingly.</td></tr>
+<tr><td valign="top"><a href="#in-2">in/2</a></td><td>in.</td></tr>
+<tr><td valign="top"><a href="#in-3">in/3</a></td><td>in with Timeout.</td></tr>
+<tr><td valign="top"><a href="#init-0">init/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#init-1">init/1</a></td><td>Initializes the gen_server.</td></tr>
+<tr><td valign="top"><a href="#match-1">match/1</a></td><td>Translates the InputPattern with wildcards (any) to a pattern which
+  actually performs dets:match_object.</td></tr>
+<tr><td valign="top"><a href="#new-2">new/2</a></td><td>new.</td></tr>
+<tr><td valign="top"><a href="#nodes-1">nodes/1</a></td><td>nodes.</td></tr>
+<tr><td valign="top"><a href="#nodes_-1">nodes_/1</a></td><td>Implements nodes(TS).</td></tr>
+<tr><td valign="top"><a href="#out-2">out/2</a></td><td>out.</td></tr>
+<tr><td valign="top"><a href="#rd-2">rd/2</a></td><td>rd.</td></tr>
+<tr><td valign="top"><a href="#rd-3">rd/3</a></td><td>rd with Timeout.</td></tr>
+<tr><td valign="top"><a href="#removeNode-2">removeNode/2</a></td><td>removeNode.</td></tr>
+<tr><td valign="top"><a href="#removeNode_-2">removeNode_/2</a></td><td>Implements removeNode.</td></tr>
+<tr><td valign="top"><a href="#removeTS-1">removeTS/1</a></td><td>removeTS.</td></tr>
+<tr><td valign="top"><a href="#removeTS_-1">removeTS_/1</a></td><td>Remove TS from metadata.</td></tr>
+<tr><td valign="top"><a href="#start-0">start/0</a></td><td>Starts the gen_server's process.</td></tr>
+<tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Stops the gen_server.</td></tr>
+<tr><td valign="top"><a href="#wake_up-1">wake_up/1</a></td><td>Handles the wake-up call after blocking, replying to
+  the caller of a gen_server method.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="addNode-2">addNode/2</a></h3>
+<div class="spec">
+<p><tt>addNode(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string, Tuple = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>addNode
+ </p>
+
+<h3 class="function"><a name="addNode_-2">addNode_/2</a></h3>
+<div class="spec">
+<p><tt>addNode_(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Node = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Implements addNode
+ </p>
+
+<h3 class="function"><a name="copy_ts-3">copy_ts/3</a></h3>
+<div class="spec">
+<p><tt>copy_ts(TS::string(), NodeFrom::atom(), NodeTo::atom()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: ok
+ </p>
+</div><p>Copies TS data from NodeFrom to NodeTo
+ </p>
+
+<h3 class="function"><a name="copy_ts-4">copy_ts/4</a></h3>
+<div class="spec">
+<p><tt>copy_ts(TS::string(), NodeFrom::atom(), NodeTo::atom(), Key::term()) -&gt; term()</tt><br></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="halt-0">halt/0</a></h3>
+<div class="spec">
+<p><tt>halt() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term().
+ </p>
+</div><p>Suspend execution with explicit call to methods
+  The code here implements the reqired block when there's no matching with methods in and rd.
+  This is done by calling the method halt with a time out of infinity.
+  Inside the handle_call the function halt is not going to reply, thus causing
+  the required block. Whenever a new_tuple_in message is received, a reply is
+  given to the caller, thus removing the block. For further details, see
+  the above function wake_up
+ </p>
+
+<h3 class="function"><a name="halt-1">halt/1</a></h3>
+<div class="spec">
+<p><tt>halt(Timeout::integer()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Implements halt with a timeout
+ </p>
+
+<h3 class="function"><a name="handle_call-3">handle_call/3</a></h3>
+<div class="spec">
+<p><tt>handle_call(Call::term(), From::term(), State::term()) -&gt; term()</tt><br></p>
+<p><tt>Call</tt>: = term(), From = term(), State = term()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>HandleCall callback function
+  NOTE: State is used to pass From to the outside
+  thus State must not be changed otherwise
+ </p>
+
+<h3 class="function"><a name="handle_cast-2">handle_cast/2</a></h3>
+<div class="spec">
+<p><tt>handle_cast(Call::atom(), State::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Callback for the stop call
+ </p>
+
+<h3 class="function"><a name="handle_info-2">handle_info/2</a></h3>
+<div class="spec">
+<p><tt>handle_info(Info::term(), State::term()) -&gt; term()</tt><br></p>
+<p><tt>Info</tt>: = term(), State = term()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Manages the incoming messages and takes action accordingly.
+  We will catch new_tuple_in message to trigger the wake_up function
+ </p>
+
+<h3 class="function"><a name="in-2">in/2</a></h3>
+<div class="spec">
+<p><tt>in(TS::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string, Pattern = tuple()
+ <br>
+</p>
+<p>returns: 
+ </p>
+</div><p>in
+ </p>
+
+<h3 class="function"><a name="in-3">in/3</a></h3>
+<div class="spec">
+<p><tt>in(TS::string(), Pattern::tuple(), Timeout::integer()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string, Pattern = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>in with Timeout
+ </p>
+
+<h3 class="function"><a name="init-0">init/0</a></h3>
+<div class="spec">
+<p><tt>init() -&gt; term()</tt><br></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="init-1">init/1</a></h3>
+<div class="spec">
+<p><tt>init(Args::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: 
+ </p>
+</div><p>Initializes the gen_server
+ </p>
+
+<h3 class="function"><a name="match-1">match/1</a></h3>
+<div class="spec">
+<p><tt>match(InputPattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>InputPattern</tt>: = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Translates the InputPattern with wildcards (any) to a pattern which
+  actually performs dets:match_object
+ </p>
+
+<h3 class="function"><a name="new-2">new/2</a></h3>
+<div class="spec">
+<p><tt>new(Name::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>Name</tt>: = string(), Node = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>new
+ </p>
+
+<h3 class="function"><a name="nodes-1">nodes/1</a></h3>
+<div class="spec">
+<p><tt>nodes(TS::string()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>nodes
+ </p>
+
+<h3 class="function"><a name="nodes_-1">nodes_/1</a></h3>
+<div class="spec">
+<p><tt>nodes_(TS::string()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Implements nodes(TS)
+ </p>
+
+<h3 class="function"><a name="out-2">out/2</a></h3>
+<div class="spec">
+<p><tt>out(TS::string(), Tuple::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string, Tuple = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>out
+ </p>
+
+<h3 class="function"><a name="rd-2">rd/2</a></h3>
+<div class="spec">
+<p><tt>rd(TS::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string, Pattern = tuple()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>rd
+ </p>
+
+<h3 class="function"><a name="rd-3">rd/3</a></h3>
+<div class="spec">
+<p><tt>rd(TS::string(), Pattern::tuple(), Timeout::integer()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string, Pattern = tuple()
+ <br>
+</p>
+<p>returns: 
+ </p>
+</div><p>rd with Timeout
+ </p>
+
+<h3 class="function"><a name="removeNode-2">removeNode/2</a></h3>
+<div class="spec">
+<p><tt>removeNode(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Tuple = tuple()
+ <br>
+</p>
+<p>returns: term().
+ </p>
+</div><p>removeNode
+ </p>
+
+<h3 class="function"><a name="removeNode_-2">removeNode_/2</a></h3>
+<div class="spec">
+<p><tt>removeNode_(TS::string(), Node::atom()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string(), Node = atom()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Implements removeNode
+ </p>
+
+<h3 class="function"><a name="removeTS-1">removeTS/1</a></h3>
+<div class="spec">
+<p><tt>removeTS(TS::string()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>removeTS
+ </p>
+
+<h3 class="function"><a name="removeTS_-1">removeTS_/1</a></h3>
+<div class="spec">
+<p><tt>removeTS_(TS::string()) -&gt; term()</tt><br></p>
+<p><tt>TS</tt>: = string()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Remove TS from metadata
+ </p>
+
+<h3 class="function"><a name="start-0">start/0</a></h3>
+<div class="spec">
+<p><tt>start() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: term()
+ </p>
+</div><p>Starts the gen_server's process
+ </p>
+
+<h3 class="function"><a name="stop-0">stop/0</a></h3>
+<div class="spec">
+<p><tt>stop() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: 
+ </p>
+</div><p>Stops the gen_server
+ </p>
+
+<h3 class="function"><a name="wake_up-1">wake_up/1</a></h3>
+<div class="spec">
+<p><tt>wake_up(From::term()) -&gt; term()</tt><br></p>
+<p><tt>From</tt>: = term()
+ <br>
+</p>
+<p>returns: term()
+ </p>
+</div><p>Handles the wake-up call after blocking, replying to
+  the caller of a gen_server method
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

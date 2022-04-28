@@ -1,7 +1,7 @@
+%% This Source Code Form is subject to the terms of the Apache License 2.0
+%% Copyright (c) 2022 Nicolò Tambone
 %%
-%%
-%%
-%% @doc This module is for handling all of the tuple space methods
+%% @doc This module is for handling the tuple space methods
 
 -module(sbts).
 -behaviour(gen_server).
@@ -62,7 +62,7 @@ new_(Name, Node) ->
    % get current metadata
    {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
 
-   % Chek if Name Node already exist
+   % Check if Name Node already exist
    TSList = ClusterMetadata?SYSTEM.ts,
    % Get all TSNames from TSList
    case lists:member(Name, [N || {N,_} <- TSList]) of
@@ -81,17 +81,17 @@ new_(Name, Node) ->
    case Action of
       add_name_and_node -> TS = [{Name, [Node]} | ClusterMetadata?SYSTEM.ts],
                            % create dets file
-                           sbdbs:open_table(Name, create_if_not_exists),
+			   erpc:call(Node, sbdbs, open_table, [Name, create_if_not_exists]),
                            % close 
-                           sbdbs:close_table(Name),
+	                   erpc:call(Node, sbdbs, close_table, [Name]),
 			   Return = {ok, [Name, Node]};
 
           add_node_only -> [{Name, ANodes}] = [{N,L} || {N,L} <- TSList, N == Name],
 		           TS = [{Name, [Node|ANodes]} | lists:delete({Name, ANodes}, ClusterMetadata?SYSTEM.ts)],
                            % create dets file
-                           sbdbs:open_table(Name, create_if_not_exists),
+			   erpc:call(Node, sbdbs, open_table, [Name, create_if_not_exists]),
                            % close 
-                           sbdbs:close_table(Name),
+	                   erpc:call(Node, sbdbs, close_table, [Name]),
 			   Return = {ok, [Name, Node]};
 
           nothing_to_do -> TS = ClusterMetadata?SYSTEM.ts,
@@ -187,46 +187,6 @@ addNode_(TS, Node) ->
 			 {ok, [Node]}
 	      end 
      end.
-
-%% TO DO:remove
-%%
-%-spec addNode_(string(), atom()) -> term().
-%addNode_(TS, Node) -> 
-% try
-%   % get current metadata
-%   {_, ClusterMetadata} = sbsystem:get_cluster_metadata(),
-%   % check wheter Node belongs to the cluster or not
-%   NodeIsRegistered = lists:member(Node, ClusterMetadata?SYSTEM.nodes), 
-%   if NodeIsRegistered == false -> 
-%      erlang:error(not_a_cluster_node);
-%      true -> ok
-%   end,
-%   % check wheter Tuple Space TS is already registered into Metadata
-%   TSisRegistered = lists:member(TS, [TSName || {TSName, _} <- ClusterMetadata?SYSTEM.ts]),
-%   if TSisRegistered == false -> 
-%      erlang:error(tuple_space_does_not_exist);
-%      true -> ok
-%   end,
-%   % Take TS data from Metadata
-%   OldTS = lists:nth(1, [{N,S} || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
-%   % Take The list of nodes associated with TS
-%   Nodes = lists:nth(1, [S || {N,S} <- ClusterMetadata?SYSTEM.ts, N == TS]),
-%   % Add the new list of nodes to the TS
-%   % TS = [{Name, [Leader]} | ClusterMetadata?SYSTEM.ts],
-%   NewTS = {TS, [Node | Nodes]}, %{TS, lists:append(Nodes, Node)},
-%   % Remove old TS data from TSList
-%   TSList = lists:delete(OldTS, ClusterMetadata?SYSTEM.ts),
-%   % Add the tuple {TS,[Nodes]} to the TSList
-%   NewTSList = [NewTS | TSList], %lists:append(TSList, NewTS),
-%   % Store the updated metadata on a peg variable
-%   CMetaUpdated = ClusterMetadata?SYSTEM{ts = NewTSList},
-%   % Save the updated metadata to ram and disk
-%   sbdbs:update_cluster_metadata(CMetaUpdated, both),
-%   % TO DO: replicate TS.dets on the new node
-%   {ok, [TS, NewTSList]}
-% catch
-%    error:Error -> {error, Error}
-% end.	 
 
 %% @doc Implements removeNode
 %%
@@ -346,8 +306,6 @@ nodes_(TS) ->
     error:Error -> {error, [Error]}
  end.	 
 
-
-
 %% @doc Starts the gen_server's process
 %%
 %% @param none
@@ -366,7 +324,7 @@ start() ->
 
 %% @doc Initializes the gen_server
 %%
-%% @param 
+%% @param _Args = term() 
 %%
 %% @returns
 %%
@@ -379,7 +337,7 @@ init() -> init(init).
 
 %% @doc Stops the gen_server
 %%
-%% @param 
+%% @param none 
 %%
 %% @returns
 %%
@@ -415,11 +373,9 @@ handle_call(Call, From, State) ->
    end,
    case {Ret, List} of
     {halt, _} -> {noreply, {no_match, From}};
-      {_, []} -> {reply, {no_match, From}, State};   %{noreply, {no_match, From}};
+      {_, []} -> {reply, {no_match, From}, State};  
        {_, _} -> {reply, {Ret, List}, State}
-       %{_, _} -> {reply, List, State}
    end.
-
 
 %% @doc Handles the wake-up call after blocking, replying to 
 %% the caller of a gen_server method 
@@ -469,7 +425,6 @@ handle_info(Info, State) ->
 handle_cast(Call, State) ->
    case Call of
       {removeNode, TS, Node} -> {Ret, List} = removeNode_(TS, Node);
-         {addNode, TS, Node} -> {Ret, List} = addNode_(TS, Node);	   
                        stop  -> {Ret, List} = {stop, []}
    end,
    case {Ret, List} of   
@@ -477,10 +432,8 @@ handle_cast(Call, State) ->
       {_, _} -> {noreply, State}	   
    end.	   
 
-
-% Suspend execution with explicit call to methods
-
-%% @doc Implements the reqired block when there's no matching with methods in and rd.
+%% @doc Suspend execution with explicit call to methods
+%% The code here implements the reqired block when there's no matching with methods in and rd.
 %% This is done by calling the method halt with a time out of infinity. 
 %% Inside the handle_call the function halt is not going to reply, thus causing 
 %% the required block. Whenever a new_tuple_in message is received, a reply is 
@@ -553,7 +506,6 @@ rd(TS, Pattern) ->
 %% @end
 -spec in(string(), tuple(), integer()) -> term().
 in(TS, Pattern, Timeout) ->
-   %gen_server:call(?MODULE, {in, TS, Pattern}, Timeout).
    try 
       Result = gen_server:call(?MODULE, {in, TS, Pattern}, Timeout),
       {ok, Result}

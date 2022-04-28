@@ -1,5 +1,5 @@
-%%
-%%
+%% This Source Code Form is subject to the terms of the Apache License 2.0
+%% Copyright (c) 2022 Nicolò Tambone
 %%
 %% @doc The module for writing and reading data on database.
 

@@ -1,10 +1,10 @@
-%%
-%%
-%%
+%% This Source Code Form is subject to the terms of the Apache License 2.0
+%% Copyright (c) 2022 Nicolò Tambone
 %%
 %% @doc This module is an interface to handle cluster metadata during runtime
 %% Its purpose is to provide efficiently cluster state informations
-
+%% @end
+%%
 -module(sbsystem).
 -behaviour(gen_server).
 -include("sys_meta.hrl").
@@ -61,10 +61,8 @@ init(_Args) ->
    end,
    {NewResp, Cluster}.
 
-% gentle stop, terminate and close table
-% see handle_cast
 %% @doc Gently stops the gen_server, terminate and close the open tables
-%% See handle_ for more details
+%% See handle_cast for more details
 %%
 %% @param none
 %%

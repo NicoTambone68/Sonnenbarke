@@ -1,0 +1,234 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module sbdbs</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module sbdbs</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>The module for writing and reading data on database.
+
+
+<h2><a name="description">Description</a></h2>The module for writing and reading data on database.
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#close_table-1">close_table/1</a></td><td>Closes the TSName's datafile.</td></tr>
+<tr><td valign="top"><a href="#close_tables-0">close_tables/0</a></td><td>Closes the cluster's metadata tables on ram and disk.</td></tr>
+<tr><td valign="top"><a href="#delete_table-1">delete_table/1</a></td><td>phisically deletes TSName's datafiles.</td></tr>
+<tr><td valign="top"><a href="#get_cluster_metadata-1">get_cluster_metadata/1</a></td><td>gets the current cluster's metadata.</td></tr>
+<tr><td valign="top"><a href="#insert_ts-2">insert_ts/2</a></td><td>Insert Value into the Tuple Space TSName.</td></tr>
+<tr><td valign="top"><a href="#lookup_table-2">lookup_table/2</a></td><td>Searches TSName for a tuple matching Pattern.</td></tr>
+<tr><td valign="top"><a href="#match_delete_ts-2">match_delete_ts/2</a></td><td>Returns one or more tuples matching the pattern Pattern
+  Deletes the matching pattern from the TS.</td></tr>
+<tr><td valign="top"><a href="#match_ts-2">match_ts/2</a></td><td>Returns one or more tuples matching the pattern Pattern.</td></tr>
+<tr><td valign="top"><a href="#open_table-1">open_table/1</a></td><td>Opens a TS datafile TSName.</td></tr>
+<tr><td valign="top"><a href="#open_table-2">open_table/2</a></td><td>Opens a Tuple Space's datafile.</td></tr>
+<tr><td valign="top"><a href="#open_tables-0">open_tables/0</a></td><td>Opens the cluster metadata's table
+  by means of the configuration parameters config/sys.config
+  Also replicates the same data structures in memory.</td></tr>
+<tr><td valign="top"><a href="#scan_ts-1">scan_ts/1</a></td><td>Opens the datafile of the Tuple Space TSName
+  Extracts the first record and the associated key.</td></tr>
+<tr><td valign="top"><a href="#scan_ts-2">scan_ts/2</a></td><td>Opens the datafile of the Tuple Space TSName
+  Reads the record associated with KeyNext,
+  which is the key following Key
+  Return the given record and KeyNext.</td></tr>
+<tr><td valign="top"><a href="#select_all-1">select_all/1</a></td><td>Gets all the records of a TS in a list
+  for debug purposes.</td></tr>
+<tr><td valign="top"><a href="#traverse-1">traverse/1</a></td><td>Prints out all the records of a TS
+  for debug purposes.</td></tr>
+<tr><td valign="top"><a href="#update_cluster_metadata-1">update_cluster_metadata/1</a></td><td>Updates cluster's metadata with the given data.</td></tr>
+<tr><td valign="top"><a href="#update_cluster_metadata-2">update_cluster_metadata/2</a></td><td>Updates cluster's metadata with the given data.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="close_table-1">close_table/1</a></h3>
+<div class="spec">
+<p><tt>close_table(TSName::string()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: ok | {error, Reason}
+ </p>
+</div><p>Closes the TSName's datafile
+ </p>
+
+<h3 class="function"><a name="close_tables-0">close_tables/0</a></h3>
+<div class="spec">
+<p><tt>close_tables() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: ok|{error, Reason}
+ </p>
+</div><p>Closes the cluster's metadata tables on ram and disk
+ </p>
+
+<h3 class="function"><a name="delete_table-1">delete_table/1</a></h3>
+<div class="spec">
+<p><tt>delete_table(TSName::string()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: ok | {ok, TSName}
+ </p>
+</div><p>phisically deletes TSName's datafiles
+ </p>
+
+<h3 class="function"><a name="get_cluster_metadata-1">get_cluster_metadata/1</a></h3>
+<div class="spec">
+<p><tt>get_cluster_metadata(From::term()) -&gt; term()</tt><br></p>
+<p><tt>From</tt>: = ram | disk
+ <br>
+</p>
+<p>returns: {ok, Cluster} | {error, no_data}
+ </p>
+</div><p>gets the current cluster's metadata
+ </p>
+
+<h3 class="function"><a name="insert_ts-2">insert_ts/2</a></h3>
+<div class="spec">
+<p><tt>insert_ts(TSName::string(), Value::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string(), Value = tuple()
+ <br>
+</p>
+<p>returns: {ok, Value} | {error, Error}
+ </p>
+</div><p>Insert Value into the Tuple Space TSName
+ </p>
+
+<h3 class="function"><a name="lookup_table-2">lookup_table/2</a></h3>
+<div class="spec">
+<p><tt>lookup_table(TSName::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string(), Pattern = tuple()
+ <br>
+</p>
+<p>returns: {ok, [Pattern]} | {error, Reason}
+ </p>
+</div><p>Searches TSName for a tuple matching Pattern
+ </p>
+
+<h3 class="function"><a name="match_delete_ts-2">match_delete_ts/2</a></h3>
+<div class="spec">
+<p><tt>match_delete_ts(TSName::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string(), Pattern = tuple()
+ <br>
+</p>
+<p>returns: {ok, [tuple()]} | {error, Reason}
+ </p>
+</div><p>Returns one or more tuples matching the pattern Pattern
+  Deletes the matching pattern from the TS
+ </p>
+
+<h3 class="function"><a name="match_ts-2">match_ts/2</a></h3>
+<div class="spec">
+<p><tt>match_ts(TSName::string(), Pattern::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string(), Pattern = tuple()
+ <br>
+</p>
+<p>returns: {ok, [tuple()]} | {error, Reason}
+ </p>
+</div><p>Returns one or more tuples matching the pattern Pattern
+ </p>
+
+<h3 class="function"><a name="open_table-1">open_table/1</a></h3>
+<div class="spec">
+<p><tt>open_table(TSName::string()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: {ok, TSName} | {err, file_not_found}
+ </p>
+</div><p>Opens a TS datafile TSName.
+ </p>
+
+<h3 class="function"><a name="open_table-2">open_table/2</a></h3>
+<div class="spec">
+<p><tt>open_table(TSName::string(), Args::tuple()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = name of the Tuple Space, Args = none | create_if_not_exists
+ <br>
+</p>
+<p>returns: {ok, TSName} | {err, file_not_found}
+ </p>
+</div><p><p>Opens a Tuple Space's datafile. Optionally creates it if it doesn't exist</p>
+ 
+ </p>
+
+<h3 class="function"><a name="open_tables-0">open_tables/0</a></h3>
+<div class="spec">
+<p><tt>open_tables() -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: none
+ </p>
+</div><p>Opens the cluster metadata's table
+  by means of the configuration parameters config/sys.config
+  Also replicates the same data structures in memory
+ </p>
+
+<h3 class="function"><a name="scan_ts-1">scan_ts/1</a></h3>
+<div class="spec">
+<p><tt>scan_ts(TSName::string()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string()
+ <br>
+</p>
+<p>returns: {Result, Key}|{error, Error}
+ </p>
+</div><p>Opens the datafile of the Tuple Space TSName
+  Extracts the first record and the associated key
+ </p>
+
+<h3 class="function"><a name="scan_ts-2">scan_ts/2</a></h3>
+<div class="spec">
+<p><tt>scan_ts(TSName::string(), Key::term()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string(), Key = term()
+ <br>
+</p>
+<p>returns: {Result, Key}|{error, Error}
+ </p>
+</div><p>Opens the datafile of the Tuple Space TSName
+  Reads the record associated with KeyNext,
+  which is the key following Key
+  Return the given record and KeyNext</p>
+
+<h3 class="function"><a name="select_all-1">select_all/1</a></h3>
+<div class="spec">
+<p><tt>select_all(TSName::string()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string()
+ <br>
+</p>
+<p>returns: [tuple()]|{error, Error}
+ </p>
+</div><p>Gets all the records of a TS in a list
+  for debug purposes
+ </p>
+
+<h3 class="function"><a name="traverse-1">traverse/1</a></h3>
+<div class="spec">
+<p><tt>traverse(TSName::string()) -&gt; term()</tt><br></p>
+<p><tt>TSName</tt>: = string()
+ <br>
+</p>
+<p>returns: [tuple()]|{error, Error}
+ </p>
+</div><p>Prints out all the records of a TS
+  for debug purposes
+ </p>
+
+<h3 class="function"><a name="update_cluster_metadata-1">update_cluster_metadata/1</a></h3>
+<div class="spec">
+<p><tt>update_cluster_metadata(Cluster::term()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: ok
+ </p>
+</div><p>Updates cluster's metadata with the given data
+ </p>
+
+<h3 class="function"><a name="update_cluster_metadata-2">update_cluster_metadata/2</a></h3>
+<div class="spec">
+<p><tt>update_cluster_metadata(Cluster::term(), Mode::atom()) -&gt; term()</tt><br></p>
+<p> </p>
+<p>returns: {ok, Cluster}
+ </p>
+</div><p>Updates cluster's metadata with the given data
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>
