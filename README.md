@@ -314,8 +314,8 @@ The raft algorithm, due to its clarity, allows to develop reliable distributed s
 
 # Appendix
 ## Why is this project named Sonnenbarke?
-Well, it is based on Ra which is the name of an open-source implementation of Raft, nevertheless also the name of a divinity of the ancient Egypt: the god Ra who is portrayed half human and half hawk. Ra wanders on two boats, one for the night and one for the day. The boat for the day is the Sun-boat, in german: Sonnenbarke. This is the title of a song of the german band Einstuerzende Neubauten, of whom I'm a massive fan. 
-[Einstuerzende Neubauten, Sonnenbarke (from the album Silence is Sexy, Mute Records, 2000)](https://youtu.be/bcKz1GTZBJg).
+Well, it is based on Ra which is the name of an open-source implementation of Raft, nevertheless also the name of a divinity of the ancient Egypt: the god Ra who is portrayed half human and half hawk. Ra wanders on two boats, one for the night and one for the day. The boat for the day is the Sun-boat, in german: Sonnenbarke. This is the title of a song of the german band Einstürzende Neubauten, of whom I'm a massive fan. 
+[Einstürzende Neubauten, Sonnenbarke (from the album Silence is Sexy, Mute Records, 2000)](https://youtu.be/bcKz1GTZBJg).
 
 
 
