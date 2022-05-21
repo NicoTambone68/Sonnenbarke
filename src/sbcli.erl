@@ -179,11 +179,18 @@ rd(TS, Pattern) ->
 %% @end
 -spec match_pattern(string(), tuple(), atom()) -> term().
 match_pattern(TS, Pattern, Function) ->
+ try
+   case is_tuple(Pattern) of
+     true -> ok;
+    false -> throw(tuple_expected)
+   end,
    {_, {Ret, Match}} =  sb:command({Function, TS, Pattern}),
    case Ret of
      no_match -> sbts:halt();
             _ -> Match
-   end.
+   end
+ catch Error:Reason -> {Error, Reason}
+ end.
 
 %% @doc Puts the tuple Tuple on the Tuple Space TS
 %%
@@ -194,7 +201,15 @@ match_pattern(TS, Pattern, Function) ->
 %% @end
 -spec out(string(), tuple()) -> term().
 out(TS, Tuple) ->
-   sb:command({out, TS, Tuple}).
+try
+   case is_tuple(Tuple) of
+     true -> ok;
+    false -> throw(tuple_expected)
+   end,
+   sb:command({out, TS, Tuple})
+catch Error:Reason -> {Error, Reason}
+end.
+
 
 % Interface 2
 
@@ -230,6 +245,10 @@ in(TS, Pattern, Timeout) ->
 -spec match_pattern_timeout(string(), tuple(), integer(), atom()) -> term().	
 match_pattern_timeout(TS, Pattern, Timeout, Function) ->
    try	
+      case is_tuple(Pattern) of
+        true -> ok;
+       false -> throw(tuple_expected)
+      end,
       {_, {Ret, Match}} =  sb:command({Function, TS, Pattern}),
       case Ret of
         no_match -> sbts:halt(Timeout);
